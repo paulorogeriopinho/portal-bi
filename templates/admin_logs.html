@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Logs de Acesso — Portal BI</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; }
+    nav {
+      background: #1a1a2e; color: #fff; padding: 0 32px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    nav .brand { font-size: 16px; font-weight: 600; }
+    nav .nav-right { display: flex; gap: 20px; align-items: center; }
+    nav a { color: #aaa; text-decoration: none; font-size: 13px; }
+    nav a:hover { color: #fff; }
+    .container { max-width: 1000px; margin: 40px auto; padding: 0 24px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    h1 { font-size: 20px; font-weight: 600; color: #1a1a2e; }
+    .count { font-size: 13px; color: #888; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    th { background: #f8f8f8; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; }
+    td { padding: 13px 16px; font-size: 14px; color: #333; border-top: 1px solid #f0f0f0; }
+    .mono { font-family: monospace; font-size: 13px; color: #666; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="brand">Portal BI</span>
+    <div class="nav-right">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/admin/users">Usuários</a>
+      <a href="/admin/permissions">Permissões</a>
+      <a href="/logout">Sair</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="header">
+      <h1>Logs de acesso</h1>
+      <span class="count">Últimos {{ logs|length }} registros</span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Data/Hora</th>
+          <th>Usuário</th>
+          <th>Relatório</th>
+          <th>IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log, u, r in logs %}
+        <tr>
+          <td class="mono">{{ log.accessed_at.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+          <td>{{ u.name }}</td>
+          <td>{{ r.name }}</td>
+          <td class="mono">{{ log.ip_address }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

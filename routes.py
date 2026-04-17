@@ -1,0 +1,671 @@
+from flask import request, jsonify, render_template, redirect, url_for, make_response
+from flask_jwt_extended import (
+    create_access_token, jwt_required, get_jwt_identity,
+    set_access_cookies, unset_jwt_cookies
+)
+from flask_mail import Message
+from auth import hash_password, check_password
+from powerbi import get_embed_token
+from datetime import datetime, timedelta
+from sqlalchemy import or_
+import random
+import string
+
+def init_routes(app, db, mail,
+                User, Report, ReportRLS, Group, ReportGroup,
+                Permission, RolePermission, AccessLog, PasswordResetCode):
+
+    # ── Helpers ──────────────────────────────────────────────────
+
+    def get_user_reports(user):
+        """Retorna (groups_data, loose_reports) considerando role + permissões extras."""
+        if user.is_admin:
+            groups  = Group.query.filter_by(active=True).order_by(Group.name).all()
+            all_grouped_ids = [rg.report_id for rg in ReportGroup.query.all()]
+            loose = Report.query.filter_by(active=True).filter(
+                ~Report.id.in_(all_grouped_ids) if all_grouped_ids else True
+            ).all()
+        else:
+            # Grupos via ROLE
+            role_group_ids = [
+                rp.group_id for rp in
+                RolePermission.query.filter_by(role=user.role, report_id=None).all()
+                if rp.group_id
+            ]
+            # Grupos via permissão INDIVIDUAL
+            user_group_ids = [
+                p.group_id for p in
+                Permission.query.filter_by(user_id=user.id, report_id=None).all()
+                if p.group_id
+            ]
+            all_group_ids = list(set(role_group_ids + user_group_ids))
+            groups = Group.query.filter(
+                Group.id.in_(all_group_ids), Group.active == True
+            ).order_by(Group.name).all() if all_group_ids else []
+
+            # Relatórios avulsos via ROLE
+            role_report_ids = [
+                rp.report_id for rp in
+                RolePermission.query.filter_by(role=user.role, group_id=None).all()
+                if rp.report_id
+            ]
+            # Relatórios avulsos via permissão INDIVIDUAL
+            user_report_ids = [
+                p.report_id for p in
+                Permission.query.filter_by(user_id=user.id, group_id=None).all()
+                if p.report_id
+            ]
+            all_report_ids = list(set(role_report_ids + user_report_ids))
+
+            # Remove os que já aparecem em grupos
+            grouped_ids = [
+                rg.report_id for rg in
+                ReportGroup.query.filter(ReportGroup.group_id.in_(all_group_ids)).all()
+            ] if all_group_ids else []
+            loose_ids = [rid for rid in all_report_ids if rid not in grouped_ids]
+            loose = Report.query.filter(
+                Report.id.in_(loose_ids), Report.active == True
+            ).all() if loose_ids else []
+
+        groups_data = []
+        for g in groups:
+            rg_ids  = [rg.report_id for rg in ReportGroup.query.filter_by(group_id=g.id).all()]
+            reports = Report.query.filter(
+                Report.id.in_(rg_ids), Report.active == True
+            ).all() if rg_ids else []
+            if reports:
+                groups_data.append({"group": g, "reports": reports})
+
+        return groups_data, loose
+
+    def can_access_report(user, report_id):
+        """Verifica se usuário pode acessar um relatório."""
+        if user.is_admin:
+            return True
+        # Via permissão individual
+        if Permission.query.filter_by(user_id=user.id, report_id=report_id, group_id=None).first():
+            return True
+        # Via permissão de role individual
+        if RolePermission.query.filter_by(role=user.role, report_id=report_id, group_id=None).first():
+            return True
+        # Via grupo (individual ou role)
+        rg_entries = ReportGroup.query.filter_by(report_id=report_id).all()
+        group_ids  = [rg.group_id for rg in rg_entries]
+        if group_ids:
+            if Permission.query.filter(
+                Permission.user_id == user.id,
+                Permission.group_id.in_(group_ids),
+                Permission.report_id == None
+            ).first():
+                return True
+            if RolePermission.query.filter(
+                RolePermission.role == user.role,
+                RolePermission.group_id.in_(group_ids),
+                RolePermission.report_id == None
+            ).first():
+                return True
+        return False
+
+    # ── Auth ─────────────────────────────────────────────────────
+
+    @app.route("/")
+    def index():
+        return redirect(url_for("login"))
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        if request.method == "GET":
+            return render_template("login.html")
+        data = request.form
+        user = User.query.filter_by(email=data["email"], active=True).first()
+        if not user or not check_password(data["password"], user.password_hash):
+            return render_template("login.html", error="Email ou senha incorretos.")
+        token    = create_access_token(identity=str(user.id))
+        response = make_response(redirect(url_for("dashboard")))
+        set_access_cookies(response, token)
+        return response
+
+    @app.route("/logout")
+    def logout():
+        response = make_response(redirect(url_for("login")))
+        unset_jwt_cookies(response)
+        return response
+
+    @app.route("/setup", methods=["GET", "POST"])
+    def setup():
+        if User.query.count() > 0:
+            return redirect(url_for("login"))
+        if request.method == "POST":
+            data  = request.form
+            admin = User(
+                name=data["name"], email=data["email"],
+                password_hash=hash_password(data["password"]),
+                is_admin=True
+            )
+            db.session.add(admin)
+            db.session.commit()
+            return redirect(url_for("login"))
+        return render_template("setup.html")
+
+    # ── Dashboard ─────────────────────────────────────────────────
+
+    @app.route("/dashboard")
+    @jwt_required()
+    def dashboard():
+        user_id = int(get_jwt_identity())
+        user    = User.query.get(user_id)
+        groups_data, loose_reports = get_user_reports(user)
+        return render_template("dashboard.html",
+                               user=user,
+                               groups_data=groups_data,
+                               loose_reports=loose_reports)
+
+    @app.route("/report/<int:report_id>")
+    @jwt_required()
+    def view_report(report_id):
+        user_id = int(get_jwt_identity())
+        user    = User.query.get(user_id)
+        report  = Report.query.get_or_404(report_id)
+        if not can_access_report(user, report_id):
+            return redirect(url_for("dashboard"))
+        log = AccessLog(user_id=user_id, report_id=report_id,
+                        ip_address=request.remote_addr,
+                        accessed_at=datetime.utcnow())
+        db.session.add(log)
+        db.session.commit()
+        rls_configs = ReportRLS.query.filter_by(report_id=report_id).all()
+        embed_data  = get_embed_token(
+            report.workspace_id, report.report_id,
+            user=user, has_rls=report.has_rls, rls_configs=rls_configs
+        )
+        return render_template("report.html", user=user, report=report, embed=embed_data)
+
+    # ── Admin Users ───────────────────────────────────────────────
+
+    @app.route("/admin/users")
+    @jwt_required()
+    def admin_users():
+        user_id = int(get_jwt_identity())
+        user    = User.query.get(user_id)
+        if not user.is_admin:
+            return redirect(url_for("dashboard"))
+
+        # Filtros
+        q       = request.args.get("q", "").strip()
+        f_role  = request.args.get("role", "")
+        f_rev   = request.args.get("revenda", "").strip()
+        f_dep   = request.args.get("departamento", "").strip()
+        f_status= request.args.get("status", "")
+
+        query = User.query
+        if q:
+            query = query.filter(or_(
+                User.name.ilike(f"%{q}%"),
+                User.email.ilike(f"%{q}%")
+            ))
+        if f_role:
+            query = query.filter_by(role=f_role)
+        if f_rev:
+            query = query.filter(User.empresa_revenda.ilike(f"%{f_rev}%"))
+        if f_dep:
+            query = query.filter(User.departamento.ilike(f"%{f_dep}%"))
+        if f_status == "active":
+            query = query.filter_by(active=True)
+        elif f_status == "inactive":
+            query = query.filter_by(active=False)
+
+        users = query.order_by(User.name).all()
+        return render_template("admin_users.html",
+                               user=user, users=users,
+                               q=q, f_role=f_role, f_rev=f_rev,
+                               f_dep=f_dep, f_status=f_status)
+
+    @app.route("/admin/users/create", methods=["POST"])
+    @jwt_required()
+    def admin_create_user():
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        data     = request.form
+        new_user = User(
+            name            = data["name"],
+            email           = data["email"],
+            password_hash   = hash_password(data["password"]),
+            is_admin        = data.get("is_admin") == "on",
+            role            = data.get("role", "user"),
+            empresa_revenda = data.get("empresa_revenda") or None,
+            departamento    = data.get("departamento") or None,
+            active          = True
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        return redirect(url_for("admin_users"))
+
+    @app.route("/admin/users/edit/<int:target_id>", methods=["POST"])
+    @jwt_required()
+    def admin_edit_user(target_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        data = request.form
+        u    = User.query.get_or_404(target_id)
+        u.name            = data["name"]
+        u.email           = data["email"]
+        u.role            = data.get("role", "user")
+        u.empresa_revenda = data.get("empresa_revenda") or None
+        u.departamento    = data.get("departamento") or None
+        u.is_admin        = data.get("is_admin") == "on"
+        u.active          = data.get("active") == "on"
+        if data.get("password"):
+            u.password_hash = hash_password(data["password"])
+        db.session.commit()
+        return redirect(url_for("admin_users"))
+
+    @app.route("/admin/users/toggle/<int:target_id>", methods=["POST"])
+    @jwt_required()
+    def admin_toggle_user(target_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        u        = User.query.get_or_404(target_id)
+        u.active = not u.active
+        db.session.commit()
+        return redirect(url_for("admin_users"))
+
+    # ── Admin Reports ─────────────────────────────────────────────
+
+    @app.route("/admin/reports")
+    @jwt_required()
+    def admin_reports():
+        user_id = int(get_jwt_identity())
+        user    = User.query.get(user_id)
+        if not user.is_admin:
+            return redirect(url_for("dashboard"))
+        reports = Report.query.order_by(Report.created_at.desc()).all()
+        for r in reports:
+            r.rls_list = ReportRLS.query.filter_by(report_id=r.id).all()
+        return render_template("admin_reports.html", user=user, reports=reports)
+
+    @app.route("/admin/reports/create", methods=["POST"])
+    @jwt_required()
+    def admin_create_report():
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        data = request.form
+        new_report = Report(
+            name         = data["name"],
+            description  = data.get("description", ""),
+            report_id    = data["report_id"],
+            workspace_id = data["workspace_id"],
+            has_rls      = data.get("has_rls") == "on",
+            active       = True
+        )
+        db.session.add(new_report)
+        db.session.commit()
+        return redirect(url_for("admin_reports"))
+
+    @app.route("/admin/reports/edit/<int:report_id>", methods=["POST"])
+    @jwt_required()
+    def admin_edit_report(report_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        report              = Report.query.get_or_404(report_id)
+        data                = request.form
+        report.name         = data["name"]
+        report.description  = data.get("description", "")
+        report.report_id    = data["report_id"]
+        report.workspace_id = data["workspace_id"]
+        report.has_rls      = data.get("has_rls") == "on"
+        db.session.commit()
+        return redirect(url_for("admin_reports"))
+
+    @app.route("/admin/reports/toggle/<int:report_id>", methods=["POST"])
+    @jwt_required()
+    def admin_toggle_report(report_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        report        = Report.query.get_or_404(report_id)
+        report.active = not report.active
+        db.session.commit()
+        return redirect(url_for("admin_reports"))
+
+    @app.route("/admin/reports/delete/<int:report_id>", methods=["POST"])
+    @jwt_required()
+    def admin_delete_report(report_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        Permission.query.filter_by(report_id=report_id).delete()
+        RolePermission.query.filter_by(report_id=report_id).delete()
+        ReportGroup.query.filter_by(report_id=report_id).delete()
+        ReportRLS.query.filter_by(report_id=report_id).delete()
+        Report.query.filter_by(id=report_id).delete()
+        db.session.commit()
+        return redirect(url_for("admin_reports"))
+
+    @app.route("/admin/reports/<int:report_id>/rls/save", methods=["POST"])
+    @jwt_required()
+    def admin_save_rls(report_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        report = Report.query.get_or_404(report_id)
+        data   = request.form
+        rls_id = data.get("rls_id")
+        if rls_id:
+            rls               = ReportRLS.query.get(int(rls_id))
+            rls.rule_name     = data["rule_name"]
+            rls.system_role   = data["system_role"]
+            rls.role_name     = data["role_name"]
+            rls.filter_source = data["filter_source"]
+            rls.description   = data.get("description", "")
+        else:
+            rls = ReportRLS(
+                report_id     = report_id,
+                rule_name     = data["rule_name"],
+                system_role   = data["system_role"],
+                role_name     = data["role_name"],
+                filter_source = data["filter_source"],
+                description   = data.get("description", "")
+            )
+            db.session.add(rls)
+        report.has_rls = True
+        db.session.commit()
+        return redirect(url_for("admin_reports"))
+
+    @app.route("/admin/reports/<int:report_id>/rls/<int:rls_id>/delete", methods=["POST"])
+    @jwt_required()
+    def admin_delete_rls(report_id, rls_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        ReportRLS.query.filter_by(id=rls_id).delete()
+        if ReportRLS.query.filter_by(report_id=report_id).count() == 0:
+            report         = Report.query.get(report_id)
+            report.has_rls = False
+        db.session.commit()
+        return redirect(url_for("admin_reports"))
+
+    # ── Admin Groups ──────────────────────────────────────────────
+
+    @app.route("/admin/groups")
+    @jwt_required()
+    def admin_groups():
+        user_id = int(get_jwt_identity())
+        user    = User.query.get(user_id)
+        if not user.is_admin:
+            return redirect(url_for("dashboard"))
+        groups  = Group.query.order_by(Group.created_at.desc()).all()
+        reports = Report.query.filter_by(active=True).order_by(Report.name).all()
+        group_report_ids = {}
+        for g in groups:
+            group_report_ids[g.id] = [
+                rg.report_id for rg in ReportGroup.query.filter_by(group_id=g.id).all()
+            ]
+        return render_template("admin_groups.html",
+                               user=user, groups=groups,
+                               reports=reports, group_report_ids=group_report_ids)
+
+    @app.route("/admin/groups/create", methods=["POST"])
+    @jwt_required()
+    def admin_create_group():
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        data  = request.form
+        group = Group(name=data["name"], description=data.get("description", ""), active=True)
+        db.session.add(group)
+        db.session.flush()
+        for rid in request.form.getlist("report_ids"):
+            db.session.add(ReportGroup(group_id=group.id, report_id=int(rid)))
+        db.session.commit()
+        return redirect(url_for("admin_groups"))
+
+    @app.route("/admin/groups/edit/<int:group_id>", methods=["POST"])
+    @jwt_required()
+    def admin_edit_group(group_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        group             = Group.query.get_or_404(group_id)
+        data              = request.form
+        group.name        = data["name"]
+        group.description = data.get("description", "")
+        ReportGroup.query.filter_by(group_id=group_id).delete()
+        for rid in request.form.getlist("report_ids"):
+            db.session.add(ReportGroup(group_id=group_id, report_id=int(rid)))
+        db.session.commit()
+        return redirect(url_for("admin_groups"))
+
+    @app.route("/admin/groups/toggle/<int:group_id>", methods=["POST"])
+    @jwt_required()
+    def admin_toggle_group(group_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        group        = Group.query.get_or_404(group_id)
+        group.active = not group.active
+        db.session.commit()
+        return redirect(url_for("admin_groups"))
+
+    @app.route("/admin/groups/delete/<int:group_id>", methods=["POST"])
+    @jwt_required()
+    def admin_delete_group(group_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        ReportGroup.query.filter_by(group_id=group_id).delete()
+        Permission.query.filter_by(group_id=group_id).delete()
+        RolePermission.query.filter_by(group_id=group_id).delete()
+        Group.query.filter_by(id=group_id).delete()
+        db.session.commit()
+        return redirect(url_for("admin_groups"))
+
+    # ── Admin Permissions ─────────────────────────────────────────
+
+    @app.route("/admin/permissions")
+    @jwt_required()
+    def admin_permissions():
+        user_id = int(get_jwt_identity())
+        user    = User.query.get(user_id)
+        if not user.is_admin:
+            return redirect(url_for("dashboard"))
+        users   = User.query.filter_by(is_admin=False, active=True).order_by(User.name).all()
+        groups  = Group.query.filter_by(active=True).order_by(Group.name).all()
+        reports = Report.query.filter_by(active=True).order_by(Report.name).all()
+        perms   = Permission.query.all()
+        return render_template("admin_permissions.html",
+                               user=user, users=users,
+                               groups=groups, reports=reports, perms=perms)
+
+    @app.route("/admin/permissions/toggle", methods=["POST"])
+    @jwt_required()
+    def toggle_permission():
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        data       = request.json
+        target_uid = data["user_id"]
+        group_id   = data.get("group_id")
+        report_id  = data.get("report_id")
+        if group_id:
+            perm = Permission.query.filter_by(
+                user_id=target_uid, group_id=group_id, report_id=None).first()
+        else:
+            perm = Permission.query.filter_by(
+                user_id=target_uid, report_id=report_id, group_id=None).first()
+        if perm:
+            db.session.delete(perm)
+            db.session.commit()
+            return jsonify({"status": "removed"})
+        new_perm = Permission(
+            user_id   = target_uid,
+            group_id  = group_id  if group_id  else None,
+            report_id = report_id if report_id else None
+        )
+        db.session.add(new_perm)
+        db.session.commit()
+        return jsonify({"status": "added"})
+
+    # ── Admin RBAC ────────────────────────────────────────────────
+
+    @app.route("/admin/roles")
+    @jwt_required()
+    def admin_roles():
+        user_id = int(get_jwt_identity())
+        user    = User.query.get(user_id)
+        if not user.is_admin:
+            return redirect(url_for("dashboard"))
+        roles   = ["user", "gerente", "diretor"]
+        groups  = Group.query.filter_by(active=True).order_by(Group.name).all()
+        reports = Report.query.filter_by(active=True).order_by(Report.name).all()
+        role_perms = {}
+        for r in roles:
+            rps = RolePermission.query.filter_by(role=r).all()
+            role_perms[r] = {
+                "group_ids":  [rp.group_id  for rp in rps if rp.group_id],
+                "report_ids": [rp.report_id for rp in rps if rp.report_id]
+            }
+        return render_template("admin_roles.html",
+                               user=user, roles=roles,
+                               groups=groups, reports=reports,
+                               role_perms=role_perms)
+
+    @app.route("/admin/roles/toggle", methods=["POST"])
+    @jwt_required()
+    def toggle_role_permission():
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        data      = request.json
+        role      = data["role"]
+        group_id  = data.get("group_id")
+        report_id = data.get("report_id")
+        if group_id:
+            perm = RolePermission.query.filter_by(
+                role=role, group_id=group_id, report_id=None).first()
+        else:
+            perm = RolePermission.query.filter_by(
+                role=role, report_id=report_id, group_id=None).first()
+        if perm:
+            db.session.delete(perm)
+            db.session.commit()
+            return jsonify({"status": "removed"})
+        new_perm = RolePermission(
+            role      = role,
+            group_id  = group_id  if group_id  else None,
+            report_id = report_id if report_id else None
+        )
+        db.session.add(new_perm)
+        db.session.commit()
+        return jsonify({"status": "added"})
+
+    # ── Admin Logs ────────────────────────────────────────────────
+
+    @app.route("/admin/logs")
+    @jwt_required()
+    def admin_logs():
+        user_id = int(get_jwt_identity())
+        user    = User.query.get(user_id)
+        if not user.is_admin:
+            return redirect(url_for("dashboard"))
+        logs = db.session.query(AccessLog, User, Report)\
+            .join(User,   AccessLog.user_id   == User.id)\
+            .join(Report, AccessLog.report_id == Report.id)\
+            .order_by(AccessLog.accessed_at.desc()).limit(200).all()
+        return render_template("admin_logs.html", user=user, logs=logs)
+
+    # ── Recuperação de senha ──────────────────────────────────────
+
+    def gerar_codigo():
+        return ''.join(random.choices(string.digits, k=6))
+
+    @app.route("/forgot-password", methods=["GET", "POST"])
+    def forgot_password():
+        if request.method == "GET":
+            return render_template("forgot_password.html")
+        email = request.form.get("email", "").strip()
+        user  = User.query.filter_by(email=email, active=True).first()
+        if not user:
+            return render_template("forgot_password.html",
+                                   error="Este email não está cadastrado no sistema.")
+        PasswordResetCode.query.filter_by(user_id=user.id, used=False).update({"used": True})
+        db.session.flush()
+        code       = gerar_codigo()
+        expires_at = datetime.utcnow() + timedelta(minutes=15)
+        reset      = PasswordResetCode(user_id=user.id, code=code, expires_at=expires_at)
+        db.session.add(reset)
+        db.session.commit()
+        try:
+            msg      = Message(subject="Código de recuperação de senha — Portal BI",
+                               recipients=[user.email])
+            msg.html = f"""
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+                        max-width:480px;margin:0 auto;padding:32px 24px;background:#fff">
+              <h2 style="color:#1a1a2e;font-size:20px;margin-bottom:8px">Recuperação de senha</h2>
+              <p style="color:#666;font-size:14px;margin-bottom:24px">
+                Use o código abaixo para redefinir sua senha no Portal BI.
+              </p>
+              <div style="background:#f0f2f5;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px">
+                <span style="font-size:36px;font-weight:700;letter-spacing:8px;color:#4f46e5">{code}</span>
+              </div>
+              <p style="color:#888;font-size:13px">⏱ Expira em <strong>15 minutos</strong>.</p>
+              <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+              <p style="color:#bbb;font-size:12px">Portal BI</p>
+            </div>"""
+            mail.send(msg)
+        except Exception as e:
+            print(f"Erro ao enviar email: {e}")
+        return redirect(url_for("reset_password", email=email))
+
+    @app.route("/reset-password", methods=["GET", "POST"])
+    def reset_password():
+        if request.method == "GET":
+            return render_template("reset_password.html", email=request.args.get("email", ""))
+        email    = request.form.get("email", "").strip()
+        code     = request.form.get("code", "").strip()
+        password = request.form.get("password", "")
+        confirm  = request.form.get("confirm", "")
+        user     = User.query.filter_by(email=email, active=True).first()
+        if not user:
+            return render_template("reset_password.html", email=email,
+                                   error="Email não encontrado.")
+        if password != confirm:
+            return render_template("reset_password.html", email=email,
+                                   error="As senhas não coincidem.")
+        if len(password) < 8:
+            return render_template("reset_password.html", email=email,
+                                   error="Mínimo 8 caracteres.")
+        reset = PasswordResetCode.query.filter_by(
+            user_id=user.id, code=code, used=False
+        ).order_by(PasswordResetCode.created_at.desc()).first()
+        if not reset:
+            return render_template("reset_password.html", email=email,
+                                   error="Código inválido ou já utilizado.")
+        if datetime.utcnow() > reset.expires_at:
+            reset.used = True
+            db.session.commit()
+            return render_template("reset_password.html", email=email,
+                                   error="Código expirado. Solicite um novo.")
+        user.password_hash = hash_password(password)
+        reset.used         = True
+        db.session.commit()
+        return render_template("reset_password.html", success=True)

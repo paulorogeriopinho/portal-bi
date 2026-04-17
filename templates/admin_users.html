@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Usuários — Portal BI</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; }
+    nav {
+      background: #1a1a2e; color: #fff; padding: 0 32px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    nav .brand { font-size: 16px; font-weight: 600; }
+    nav .nav-right { display: flex; gap: 20px; align-items: center; }
+    nav a { color: #aaa; text-decoration: none; font-size: 13px; }
+    nav a:hover { color: #fff; }
+    .container { max-width: 1200px; margin: 40px auto; padding: 0 24px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .header h1 { font-size: 20px; font-weight: 600; color: #1a1a2e; }
+    /* Filtros */
+    .filters {
+      background: #fff; border-radius: 12px; border: 1px solid #eee;
+      padding: 16px 20px; margin-bottom: 20px;
+      display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+    }
+    .filter-group { display: flex; flex-direction: column; gap: 5px; min-width: 140px; flex: 1; }
+    .filter-group label { font-size: 12px; font-weight: 500; color: #888; }
+    .filter-group input, .filter-group select {
+      padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px;
+      font-size: 13px; outline: none; background: #fff;
+    }
+    .filter-group input:focus, .filter-group select:focus { border-color: #4f46e5; }
+    .filter-actions { display: flex; gap: 8px; align-items: flex-end; }
+    /* Botões */
+    .btn { padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; border: none; display: inline-block; }
+    .btn-primary { background: #4f46e5; color: #fff; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-outline { border: 1px solid #ddd; background: #fff; color: #444; }
+    .btn-outline:hover { background: #f5f5f5; }
+    .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .btn-danger:hover { background: #fee2e2; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    /* Tabela */
+    .table-wrap { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8f8f8; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; }
+    td { padding: 13px 16px; font-size: 14px; color: #333; border-top: 1px solid #f0f0f0; vertical-align: middle; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .badge-admin   { background: #ede9fe; color: #5b21b6; }
+    .badge-gerente { background: #fef3c7; color: #92400e; }
+    .badge-diretor { background: #dbeafe; color: #1e40af; }
+    .badge-user    { background: #f0fdf4; color: #166534; }
+    .badge-active  { background: #f0fdf4; color: #166534; }
+    .badge-inactive{ background: #fef2f2; color: #dc2626; }
+    .actions { display: flex; gap: 6px; }
+    .count { font-size: 13px; color: #888; margin-bottom: 12px; }
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 100;
+      align-items: flex-start; justify-content: center;
+      padding: 40px 16px; overflow-y: auto;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: #fff; border-radius: 12px; padding: 36px 32px;
+      width: 100%; max-width: 500px; box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+      margin: auto;
+    }
+    .modal h2 { font-size: 18px; font-weight: 600; margin-bottom: 24px; color: #1a1a2e; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { display: block; font-size: 13px; font-weight: 500; color: #444; margin-bottom: 6px; }
+    input[type=text], input[type=email], input[type=password], select {
+      width: 100%; padding: 10px 14px; border: 1px solid #ddd;
+      border-radius: 8px; font-size: 14px; margin-bottom: 14px;
+      outline: none; font-family: inherit; background: #fff;
+    }
+    input:focus, select:focus { border-color: #4f46e5; }
+    .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; font-size: 14px; color: #444; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .hint { font-size: 12px; color: #aaa; margin-top: -10px; margin-bottom: 14px; }
+    .empty { text-align: center; padding: 60px 20px; color: #aaa; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="brand">Portal BI</span>
+    <div class="nav-right">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/admin/roles">Perfis</a>
+      <a href="/admin/groups">Grupos</a>
+      <a href="/admin/reports">Relatórios</a>
+      <a href="/admin/permissions">Permissões</a>
+      <a href="/admin/logs">Logs</a>
+      <a href="/logout">Sair</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="header">
+      <h1>Usuários</h1>
+      <button class="btn btn-primary" onclick="openModal('modal-create')">+ Novo usuário</button>
+    </div>
+
+    <!-- Filtros -->
+    <form method="GET" action="/admin/users">
+      <div class="filters">
+        <div class="filter-group" style="flex:2">
+          <label>Buscar</label>
+          <input type="text" name="q" value="{{ q }}" placeholder="Nome ou email...">
+        </div>
+        <div class="filter-group">
+          <label>Perfil</label>
+          <select name="role">
+            <option value="">Todos</option>
+            <option value="user"    {% if f_role == 'user'    %}selected{% endif %}>Usuário</option>
+            <option value="gerente" {% if f_role == 'gerente' %}selected{% endif %}>Gerente</option>
+            <option value="diretor" {% if f_role == 'diretor' %}selected{% endif %}>Diretor</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Revenda</label>
+          <input type="text" name="revenda" value="{{ f_rev }}" placeholder="Ex: 1.18">
+        </div>
+        <div class="filter-group">
+          <label>Departamento</label>
+          <input type="text" name="departamento" value="{{ f_dep }}" placeholder="Ex: Financeiro">
+        </div>
+        <div class="filter-group">
+          <label>Status</label>
+          <select name="status">
+            <option value="">Todos</option>
+            <option value="active"   {% if f_status == 'active'   %}selected{% endif %}>Ativo</option>
+            <option value="inactive" {% if f_status == 'inactive' %}selected{% endif %}>Inativo</option>
+          </select>
+        </div>
+        <div class="filter-actions">
+          <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+          <a href="/admin/users" class="btn btn-outline btn-sm">Limpar</a>
+        </div>
+      </div>
+    </form>
+
+    <p class="count">{{ users|length }} usuário(s) encontrado(s)</p>
+
+    {% if users %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Email</th>
+            <th>Perfil</th>
+            <th>Revenda</th>
+            <th>Departamento</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td><strong>{{ u.name }}</strong></td>
+            <td style="color:#666">{{ u.email }}</td>
+            <td>
+              {% if u.is_admin %}
+                <span class="badge badge-admin">Admin</span>
+              {% elif u.role == 'gerente' %}
+                <span class="badge badge-gerente">Gerente</span>
+              {% elif u.role == 'diretor' %}
+                <span class="badge badge-diretor">Diretor</span>
+              {% else %}
+                <span class="badge badge-user">Usuário</span>
+              {% endif %}
+            </td>
+            <td>{{ u.empresa_revenda or '—' }}</td>
+            <td>{{ u.departamento or '—' }}</td>
+            <td>
+              {% if u.active %}
+                <span class="badge badge-active">Ativo</span>
+              {% else %}
+                <span class="badge badge-inactive">Inativo</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="actions">
+                <button class="btn btn-outline btn-sm" onclick="openEditModal(
+                  {{ u.id }},
+                  '{{ u.name }}',
+                  '{{ u.email }}',
+                  '{{ u.role }}',
+                  '{{ u.empresa_revenda or '' }}',
+                  '{{ u.departamento or '' }}',
+                  {{ 'true' if u.is_admin else 'false' }},
+                  {{ 'true' if u.active else 'false' }}
+                )">Editar</button>
+                <form method="POST" action="/admin/users/toggle/{{ u.id }}" style="display:inline">
+                  <button class="btn btn-sm {% if u.active %}btn-danger{% else %}btn-outline{% endif %}">
+                    {% if u.active %}Desativar{% else %}Ativar{% endif %}
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty">Nenhum usuário encontrado com os filtros aplicados.</div>
+    {% endif %}
+  </div>
+
+  <!-- Modal criar -->
+  <div class="modal-overlay" id="modal-create">
+    <div class="modal">
+      <h2>Novo usuário</h2>
+      <form method="POST" action="/admin/users/create">
+        <label>Nome</label>
+        <input type="text" name="name" required autofocus>
+        <label>Email</label>
+        <input type="email" name="email" required>
+        <label>Senha</label>
+        <input type="password" name="password" required placeholder="Mínimo 8 caracteres">
+        <label>Perfil</label>
+        <select name="role">
+          <option value="user">Usuário comum</option>
+          <option value="gerente">Gerente</option>
+          <option value="diretor">Diretor</option>
+        </select>
+        <div class="form-row">
+          <div>
+            <label>Código da revenda</label>
+            <input type="text" name="empresa_revenda" placeholder="Ex: 1.18">
+          </div>
+          <div>
+            <label>Departamento</label>
+            <input type="text" name="departamento" placeholder="Ex: Financeiro">
+          </div>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="is_admin" id="create-is-admin">
+          <label for="create-is-admin" style="margin:0;font-weight:400">Administrador</label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="closeModal('modal-create')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Criar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal editar -->
+  <div class="modal-overlay" id="modal-edit">
+    <div class="modal">
+      <h2>Editar usuário</h2>
+      <form method="POST" id="form-edit">
+        <label>Nome</label>
+        <input type="text" name="name" id="edit-name" required>
+        <label>Email</label>
+        <input type="email" name="email" id="edit-email" required>
+        <label>Nova senha <span style="color:#aaa;font-weight:400">(deixe em branco para manter)</span></label>
+        <input type="password" name="password" placeholder="Mínimo 8 caracteres">
+        <label>Perfil</label>
+        <select name="role" id="edit-role">
+          <option value="user">Usuário comum</option>
+          <option value="gerente">Gerente</option>
+          <option value="diretor">Diretor</option>
+        </select>
+        <div class="form-row">
+          <div>
+            <label>Código da revenda</label>
+            <input type="text" name="empresa_revenda" id="edit-revenda" placeholder="Ex: 1.18">
+          </div>
+          <div>
+            <label>Departamento</label>
+            <input type="text" name="departamento" id="edit-depto" placeholder="Ex: Financeiro">
+          </div>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="is_admin" id="edit-is-admin">
+          <label for="edit-is-admin" style="margin:0;font-weight:400">Administrador</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" name="active" id="edit-active">
+          <label for="edit-active" style="margin:0;font-weight:400">Usuário ativo</label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="closeModal('modal-edit')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function openModal(id) { document.getElementById(id).classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    function openEditModal(id, name, email, role, revenda, depto, isAdmin, active) {
+      document.getElementById('form-edit').action      = '/admin/users/edit/' + id;
+      document.getElementById('edit-name').value       = name;
+      document.getElementById('edit-email').value      = email;
+      document.getElementById('edit-revenda').value    = revenda;
+      document.getElementById('edit-depto').value      = depto;
+      document.getElementById('edit-is-admin').checked = isAdmin;
+      document.getElementById('edit-active').checked   = active;
+      var sel = document.getElementById('edit-role');
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === role) { sel.selectedIndex = i; break; }
+      }
+      openModal('modal-edit');
+    }
+
+    document.querySelectorAll('.modal-overlay').forEach(function(o) {
+      o.addEventListener('click', function(e) {
+        if (e.target === o) o.classList.remove('active');
+      });
+    });
+  </script>
+</body>
+</html>

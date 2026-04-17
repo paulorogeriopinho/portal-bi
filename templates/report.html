@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ report.name }} — Portal BI</title>
+  <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5; display: flex; flex-direction: column; height: 100vh;
+    }
+    nav {
+      background: #1a1a2e; color: #fff;
+      padding: 0 32px; height: 52px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    nav .brand { font-size: 15px; font-weight: 600; }
+    nav .nav-right { display: flex; align-items: center; gap: 20px; font-size: 13px; }
+    nav a { color: #aaa; text-decoration: none; }
+    nav a:hover { color: #fff; }
+    .report-bar {
+      background: #fff; border-bottom: 1px solid #eee;
+      padding: 0 32px; height: 48px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .report-bar h2 { font-size: 15px; font-weight: 600; color: #1a1a2e; }
+    .report-bar a { font-size: 13px; color: #4f46e5; text-decoration: none; font-weight: 500; }
+    .report-bar a:hover { text-decoration: underline; }
+    .iframe-wrapper { flex: 1; padding: 16px; display: flex; }
+    #pbi-container {
+      flex: 1; border-radius: 10px; overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08); background: #fff;
+    }
+    #pbi-container iframe { border: none !important; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="brand">Portal BI</span>
+    <div class="nav-right">
+      <span>{{ user.name }}</span>
+      <a href="/logout">Sair</a>
+    </div>
+  </nav>
+
+  <div class="report-bar">
+    <h2>{{ report.name }}</h2>
+    <a href="/dashboard">← Voltar ao dashboard</a>
+  </div>
+
+  <div class="iframe-wrapper">
+    <div id="pbi-container"></div>
+  </div>
+
+  <script>
+    var embedToken = "{{ embed.embed_token }}";
+    var embedUrl   = "{{ embed.embed_url }}";
+    var reportId   = "{{ embed.report_id }}";
+
+    var models = window['powerbi-client'].models;
+
+    var config = {
+      type: 'report',
+      tokenType: models.TokenType.Embed,
+      accessToken: embedToken,
+      embedUrl: embedUrl,
+      id: reportId,
+      permissions: models.Permissions.Read,
+      settings: {
+        panes: {
+          filters: { expanded: false, visible: true },
+          pageNavigation: { visible: true }
+        },
+        background: models.BackgroundType.Transparent
+      }
+    };
+
+    var container = document.getElementById('pbi-container');
+    var report = powerbi.embed(container, config);
+
+    report.on('error', function(event) {
+      console.error('Power BI error:', event.detail);
+    });
+
+    report.on('loaded', function() {
+      console.log('Relatório carregado com sucesso!');
+    });
+  </script>
+</body>
+</html>

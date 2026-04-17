@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Grupos — Portal BI</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; }
+    nav {
+      background: #1a1a2e; color: #fff; padding: 0 32px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    nav .brand { font-size: 16px; font-weight: 600; }
+    nav .nav-right { display: flex; gap: 20px; align-items: center; }
+    nav a { color: #aaa; text-decoration: none; font-size: 13px; }
+    nav a:hover { color: #fff; }
+    .container { max-width: 1000px; margin: 40px auto; padding: 0 24px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .header h1 { font-size: 20px; font-weight: 600; color: #1a1a2e; }
+    .btn { padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; border: none; display: inline-block; }
+    .btn-primary { background: #4f46e5; color: #fff; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-outline { border: 1px solid #ddd; background: #fff; color: #444; }
+    .btn-outline:hover { background: #f5f5f5; }
+    .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+    .btn-danger:hover { background: #fee2e2; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    th { background: #f8f8f8; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; }
+    td { padding: 14px 16px; font-size: 14px; color: #333; border-top: 1px solid #f0f0f0; vertical-align: middle; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .badge-active { background: #f0fdf4; color: #166534; }
+    .badge-inactive { background: #fef2f2; color: #dc2626; }
+    .badge-count { background: #ede9fe; color: #5b21b6; }
+    .actions { display: flex; gap: 8px; }
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.4); z-index: 100;
+      align-items: flex-start; justify-content: center;
+      padding: 40px 16px; overflow-y: auto;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: #fff; border-radius: 12px; padding: 36px 32px;
+      width: 100%; max-width: 540px; box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+      margin: auto;
+    }
+    .modal h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; color: #1a1a2e; }
+    .modal p { font-size: 13px; color: #888; margin-bottom: 24px; }
+    label { display: block; font-size: 13px; font-weight: 500; color: #444; margin-bottom: 6px; }
+    input[type=text], textarea {
+      width: 100%; padding: 10px 14px; border: 1px solid #ddd;
+      border-radius: 8px; font-size: 14px; margin-bottom: 16px; outline: none; font-family: inherit;
+    }
+    input:focus, textarea:focus { border-color: #4f46e5; }
+    textarea { resize: vertical; min-height: 64px; }
+    .reports-list {
+      border: 1px solid #ddd; border-radius: 8px;
+      max-height: 220px; overflow-y: auto; margin-bottom: 20px;
+    }
+    .report-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-bottom: 1px solid #f0f0f0;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .report-option:last-child { border-bottom: none; }
+    .report-option:hover { background: #f8f8f8; }
+    .report-option input[type=checkbox] { width: 16px; height: 16px; accent-color: #4f46e5; cursor: pointer; }
+    .report-option span { font-size: 14px; color: #333; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .empty { text-align: center; padding: 60px 20px; color: #aaa; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="brand">Portal BI</span>
+    <div class="nav-right">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/admin/users">Usuários</a>
+      <a href="/admin/reports">Relatórios</a>
+      <a href="/admin/permissions">Permissões</a>
+      <a href="/admin/logs">Logs</a>
+      <a href="/logout">Sair</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="header">
+      <h1>Grupos</h1>
+      <button class="btn btn-primary" onclick="openModal('modal-create')">+ Novo grupo</button>
+    </div>
+
+    {% if groups %}
+    <table>
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Descrição</th>
+          <th>Relatórios</th>
+          <th>Status</th>
+          <th>Criado em</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in groups %}
+        <tr>
+          <td><strong>{{ g.name }}</strong></td>
+          <td style="color:#888">{{ g.description or '—' }}</td>
+          <td>
+            <span class="badge badge-count">
+              {{ group_report_ids[g.id]|length }} relatório(s)
+            </span>
+          </td>
+          <td>
+            {% if g.active %}
+            <span class="badge badge-active">Ativo</span>
+            {% else %}
+            <span class="badge badge-inactive">Inativo</span>
+            {% endif %}
+          </td>
+          <td>{{ g.created_at.strftime('%d/%m/%Y') }}</td>
+          <td>
+            <div class="actions">
+              <button class="btn btn-outline btn-sm"
+                onclick="openEdit({{ g.id }}, '{{ g.name }}', '{{ g.description or '' }}', {{ group_report_ids[g.id] }})">
+                Editar
+              </button>
+              <form method="POST" action="/admin/groups/toggle/{{ g.id }}" style="display:inline">
+                <button class="btn btn-outline btn-sm" type="submit">
+                  {% if g.active %}Desativar{% else %}Ativar{% endif %}
+                </button>
+              </form>
+              <form method="POST" action="/admin/groups/delete/{{ g.id }}" style="display:inline"
+                onsubmit="return confirm('Excluir este grupo?')">
+                <button class="btn btn-danger btn-sm" type="submit">Excluir</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">
+      <div style="font-size:48px">📁</div>
+      <p style="margin-top:12px">Nenhum grupo cadastrado ainda.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Modal criar -->
+  <div class="modal-overlay" id="modal-create">
+    <div class="modal">
+      <h2>Novo grupo</h2>
+      <p>Agrupe relatórios por área ou tema.</p>
+      <form method="POST" action="/admin/groups/create">
+        <label>Nome do grupo</label>
+        <input type="text" name="name" placeholder="Ex: Comercial" required autofocus>
+        <label>Descrição <span style="color:#aaa;font-weight:400">(opcional)</span></label>
+        <textarea name="description" placeholder="Breve descrição do grupo"></textarea>
+        <label>Relatórios do grupo</label>
+        <div class="reports-list">
+          {% for r in reports %}
+          <label class="report-option">
+            <input type="checkbox" name="report_ids" value="{{ r.id }}">
+            <span>{{ r.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="closeModal('modal-create')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal editar -->
+  <div class="modal-overlay" id="modal-edit">
+    <div class="modal">
+      <h2>Editar grupo</h2>
+      <p>Atualize as informações e os relatórios do grupo.</p>
+      <form method="POST" id="form-edit">
+        <label>Nome do grupo</label>
+        <input type="text" name="name" id="edit-name" required>
+        <label>Descrição</label>
+        <textarea name="description" id="edit-description"></textarea>
+        <label>Relatórios do grupo</label>
+        <div class="reports-list" id="edit-reports-list">
+          {% for r in reports %}
+          <label class="report-option">
+            <input type="checkbox" name="report_ids" value="{{ r.id }}" data-report-id="{{ r.id }}">
+            <span>{{ r.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="closeModal('modal-edit')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function openModal(id) {
+      document.getElementById(id).classList.add('active');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+    function openEdit(id, name, description, reportIds) {
+      document.getElementById('form-edit').action = '/admin/groups/edit/' + id;
+      document.getElementById('edit-name').value        = name;
+      document.getElementById('edit-description').value = description;
+      // Marca checkboxes conforme relatórios do grupo
+      document.querySelectorAll('#edit-reports-list input[type=checkbox]').forEach(function(cb) {
+        cb.checked = reportIds.includes(parseInt(cb.dataset.reportId));
+      });
+      openModal('modal-edit');
+    }
+    document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) overlay.classList.remove('active');
+      });
+    });
+  </script>
+</body>
+</html>

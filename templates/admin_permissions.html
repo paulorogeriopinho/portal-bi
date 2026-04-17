@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Permissões — Portal BI</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; }
+    nav {
+      background: #1a1a2e; color: #fff; padding: 0 32px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    nav .brand { font-size: 16px; font-weight: 600; }
+    nav .nav-right { display: flex; gap: 20px; align-items: center; }
+    nav a { color: #aaa; text-decoration: none; font-size: 13px; }
+    nav a:hover { color: #fff; }
+    .container { max-width: 1100px; margin: 40px auto; padding: 0 24px; }
+    h1 { font-size: 20px; font-weight: 600; color: #1a1a2e; margin-bottom: 6px; }
+    .sub { font-size: 13px; color: #888; margin-bottom: 28px; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 24px; }
+    .tab {
+      padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
+      cursor: pointer; border: 1px solid #ddd; background: #fff; color: #666;
+      transition: all 0.15s;
+    }
+    .tab.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    th { background: #f8f8f8; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; }
+    th.center { text-align: center; }
+    td { padding: 12px 16px; font-size: 14px; color: #333; border-top: 1px solid #f0f0f0; }
+    td.center { text-align: center; }
+    .toggle {
+      width: 36px; height: 20px; border-radius: 10px; border: none;
+      cursor: pointer; transition: background 0.2s; display: inline-block;
+      position: relative; background: #e0e0e0; vertical-align: middle;
+    }
+    .toggle.on { background: #4f46e5; }
+    .toggle::after {
+      content: ''; position: absolute; width: 14px; height: 14px;
+      border-radius: 50%; background: #fff; top: 3px; left: 3px;
+      transition: transform 0.2s;
+    }
+    .toggle.on::after { transform: translateX(16px); }
+    .empty-col { color: #ccc; font-size: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="brand">Portal BI</span>
+    <div class="nav-right">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/admin/users">Usuários</a>
+      <a href="/admin/groups">Grupos</a>
+      <a href="/admin/reports">Relatórios</a>
+      <a href="/admin/logs">Logs</a>
+      <a href="/logout">Sair</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Permissões</h1>
+    <p class="sub">Libere grupos ou relatórios avulsos para cada usuário.</p>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('tab-groups', this)">Por grupos</button>
+      <button class="tab" onclick="showTab('tab-reports', this)">Por relatórios avulsos</button>
+    </div>
+
+    <!-- Aba Grupos -->
+    <div class="tab-content active" id="tab-groups">
+      {% if groups %}
+      <table>
+        <thead>
+          <tr>
+            <th>Usuário</th>
+            {% for g in groups %}
+            <th class="center">{{ g.name }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td><strong>{{ u.name }}</strong><br><span style="font-size:12px;color:#888">{{ u.email }}</span></td>
+            {% for g in groups %}
+            {% set has = perms | selectattr('user_id', 'equalto', u.id)
+                                | selectattr('group_id', 'equalto', g.id)
+                                | list | length > 0 %}
+            <td class="center">
+              <button class="toggle {% if has %}on{% endif %}"
+                onclick="togglePerm(this, {{ u.id }}, null, {{ g.id }})">
+              </button>
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-col" style="padding:40px;background:#fff;border-radius:12px;display:block">
+        Nenhum grupo cadastrado ainda. <a href="/admin/groups" style="color:#4f46e5">Criar grupo</a>
+      </p>
+      {% endif %}
+    </div>
+
+    <!-- Aba Relatórios avulsos -->
+    <div class="tab-content" id="tab-reports">
+      {% if reports %}
+      <table>
+        <thead>
+          <tr>
+            <th>Usuário</th>
+            {% for r in reports %}
+            <th class="center">{{ r.name }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td><strong>{{ u.name }}</strong><br><span style="font-size:12px;color:#888">{{ u.email }}</span></td>
+            {% for r in reports %}
+            {% set has = perms | selectattr('user_id', 'equalto', u.id)
+                                | selectattr('report_id', 'equalto', r.id)
+                                | list | length > 0 %}
+            <td class="center">
+              <button class="toggle {% if has %}on{% endif %}"
+                onclick="togglePerm(this, {{ u.id }}, {{ r.id }}, null)">
+              </button>
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-col" style="padding:40px;background:#fff;border-radius:12px;display:block">
+        Nenhum relatório cadastrado ainda. <a href="/admin/reports" style="color:#4f46e5">Criar relatório</a>
+      </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <script>
+    function showTab(tabId, btn) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    async function togglePerm(btn, userId, reportId, groupId) {
+      const res = await fetch('/admin/permissions/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, report_id: reportId, group_id: groupId })
+      });
+      const data = await res.json();
+      btn.classList.toggle('on', data.status === 'added');
+    }
+  </script>
+</body>
+</html>
