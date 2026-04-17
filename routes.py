@@ -486,14 +486,9 @@ def init_routes(app, db, mail,
         user    = User.query.get(user_id)
         if not user.is_admin:
             return redirect(url_for("dashboard"))
-        users   = User.query.filter_by(is_admin=False, active=True).order_by(User.name).all()
-        groups  = Group.query.filter_by(active=True).order_by(Group.name).all()
-        reports = Report.query.filter_by(active=True).order_by(Report.name).all()
-        perms   = Permission.query.all()
-        return render_template("admin_permissions.html",
-                               user=user, users=users,
-                               groups=groups, reports=reports, perms=perms)
-
+        users = User.query.filter_by(is_admin=False, active=True).order_by(User.name).all()
+        return render_template("admin_permissions.html", user=user, users=users)
+    
     @app.route("/admin/permissions/toggle", methods=["POST"])
     @jwt_required()
     def toggle_permission():
@@ -533,20 +528,7 @@ def init_routes(app, db, mail,
         user    = User.query.get(user_id)
         if not user.is_admin:
             return redirect(url_for("dashboard"))
-        roles   = ["user", "gerente", "diretor"]
-        groups  = Group.query.filter_by(active=True).order_by(Group.name).all()
-        reports = Report.query.filter_by(active=True).order_by(Report.name).all()
-        role_perms = {}
-        for r in roles:
-            rps = RolePermission.query.filter_by(role=r).all()
-            role_perms[r] = {
-                "group_ids":  [rp.group_id  for rp in rps if rp.group_id],
-                "report_ids": [rp.report_id for rp in rps if rp.report_id]
-            }
-        return render_template("admin_roles.html",
-                               user=user, roles=roles,
-                               groups=groups, reports=reports,
-                               role_perms=role_perms)
+        return render_template("admin_roles.html", user=user)
 
     @app.route("/admin/roles/toggle", methods=["POST"])
     @jwt_required()
@@ -669,3 +651,94 @@ def init_routes(app, db, mail,
         reset.used         = True
         db.session.commit()
         return render_template("reset_password.html", success=True)
+    
+    # ── API JSON para permissões dinâmicas ───────────────────────
+
+    @app.route("/admin/permissions/user/<int:target_id>")
+    @jwt_required()
+    def get_user_permissions(target_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+
+        target = User.query.get_or_404(target_id)
+
+        # Permissões individuais
+        ind_group_ids  = {p.group_id  for p in Permission.query.filter_by(user_id=target_id, report_id=None).all() if p.group_id}
+        ind_report_ids = {p.report_id for p in Permission.query.filter_by(user_id=target_id, group_id=None).all() if p.report_id}
+
+        # Permissões herdadas da role
+        role_group_ids  = {rp.group_id  for rp in RolePermission.query.filter_by(role=target.role, report_id=None).all() if rp.group_id}
+        role_report_ids = {rp.report_id for rp in RolePermission.query.filter_by(role=target.role, group_id=None).all() if rp.report_id}
+
+        # Todos os grupos ativos
+        groups = Group.query.filter_by(active=True).order_by(Group.name).all()
+        groups_data = []
+        for g in groups:
+            source = None
+            if g.id in role_group_ids:
+                source = "role"
+            elif g.id in ind_group_ids:
+                source = "individual"
+            groups_data.append({
+                "id":     g.id,
+                "name":   g.name,
+                "source": source
+            })
+
+        # Todos os relatórios ativos
+        reports = Report.query.filter_by(active=True).order_by(Report.name).all()
+        reports_data = []
+        for r in reports:
+            source = None
+            if r.id in role_report_ids:
+                source = "role"
+            elif r.id in ind_report_ids:
+                source = "individual"
+            reports_data.append({
+                "id":     r.id,
+                "name":   r.name,
+                "source": source
+            })
+
+        return jsonify({
+            "user": {
+                "id":               target.id,
+                "name":             target.name,
+                "role":             target.role,
+                "empresa_revenda":  target.empresa_revenda or "—",
+                "departamento":     target.departamento or "—",
+                "ind_count":        len(ind_group_ids) + len(ind_report_ids)
+            },
+            "groups":  groups_data,
+            "reports": reports_data
+        })
+
+    @app.route("/admin/permissions/role/<string:role>")
+    @jwt_required()
+    def get_role_permissions(role):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+
+        role_group_ids  = {rp.group_id  for rp in RolePermission.query.filter_by(role=role, report_id=None).all() if rp.group_id}
+        role_report_ids = {rp.report_id for rp in RolePermission.query.filter_by(role=role, group_id=None).all() if rp.report_id}
+
+        groups = Group.query.filter_by(active=True).order_by(Group.name).all()
+        groups_data = [{"id": g.id, "name": g.name, "active": g.id in role_group_ids} for g in groups]
+
+        reports = Report.query.filter_by(active=True).order_by(Report.name).all()
+        reports_data = [{"id": r.id, "name": r.name, "active": r.id in role_report_ids} for r in reports]
+
+        role_labels = {"user": "Usuário comum", "gerente": "Gerente", "diretor": "Diretor"}
+        user_count  = User.query.filter_by(role=role, active=True).count()
+
+        return jsonify({
+            "role":       role,
+            "label":      role_labels.get(role, role),
+            "user_count": user_count,
+            "groups":     groups_data,
+            "reports":    reports_data
+        })
