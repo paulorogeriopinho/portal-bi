@@ -1,162 +1,132 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard — Portal BI</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; }
-    nav {
-      background: #1a1a2e; color: #fff;
-      padding: 0 32px; height: 56px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    nav .brand { font-size: 16px; font-weight: 600; }
-    nav .nav-right { display: flex; align-items: center; gap: 24px; font-size: 13px; }
-    nav a { color: #aaa; text-decoration: none; transition: color 0.2s; }
-    nav a:hover { color: #fff; }
-    nav .user-name { color: #e0e0e0; }
-    .container { max-width: 1100px; margin: 40px auto; padding: 0 24px; }
-    .page-title { font-size: 22px; font-weight: 600; color: #1a1a2e; margin-bottom: 8px; }
-    .page-sub { font-size: 14px; color: #888; margin-bottom: 28px; }
-    .admin-bar {
-      background: #fff; border-radius: 12px; border: 1px solid #eee;
-      padding: 14px 20px; margin-bottom: 28px;
-      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-    }
-    .admin-bar span { font-size: 13px; font-weight: 500; color: #555; margin-right: 6px; }
-    .btn {
-      padding: 7px 14px; border-radius: 8px; font-size: 13px;
-      font-weight: 500; text-decoration: none; transition: background 0.2s;
-      border: 1px solid #ddd; color: #444; background: #fff;
-    }
-    .btn:hover { background: #f5f5f5; }
-    /* Grupos */
-    .group-section { margin-bottom: 36px; }
-    .group-header {
-      display: flex; align-items: center; gap: 10px;
-      margin-bottom: 14px;
-    }
-    .group-icon {
-      width: 32px; height: 32px; border-radius: 8px;
-      background: #ede9fe; display: flex; align-items: center;
-      justify-content: center; font-size: 16px; flex-shrink: 0;
-    }
-    .group-name { font-size: 16px; font-weight: 600; color: #1a1a2e; }
-    .group-desc { font-size: 13px; color: #888; margin-top: 1px; }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 16px;
-    }
-    .report-card {
-      background: #fff; border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      padding: 22px 20px;
-      text-decoration: none; color: inherit;
-      border: 1px solid #eee;
-      transition: transform 0.15s, box-shadow 0.15s;
-      display: block;
-    }
-    .report-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0,0,0,0.09);
-    }
-    .report-icon {
-      width: 40px; height: 40px; border-radius: 9px;
-      background: #f0f9ff; display: flex; align-items: center;
-      justify-content: center; margin-bottom: 12px; font-size: 20px;
-    }
-    .report-name { font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px; }
-    .report-desc { font-size: 12px; color: #888; line-height: 1.5; }
-    .divider {
-      border: none; border-top: 1px solid #e8e8e8;
-      margin: 32px 0;
-    }
-    .section-label {
-      font-size: 13px; font-weight: 600; color: #aaa;
-      text-transform: uppercase; letter-spacing: 0.5px;
-      margin-bottom: 14px;
-    }
-    .empty {
-      text-align: center; padding: 80px 20px; color: #aaa;
-    }
-    .empty p { font-size: 15px; margin-top: 12px; }
-  </style>
-</head>
-<body>
-  <nav>
-    <span class="brand">Portal BI</span>
-    <div class="nav-right">
-      <span class="user-name">{{ user.name }}</span>
-      <a href="/logout">Sair</a>
-    </div>
-  </nav>
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
 
-  <div class="container">
-    <h1 class="page-title">Relatórios</h1>
-    <p class="page-sub">Selecione um relatório para visualizar.</p>
+{% block nav_links %}
+  {% if user.is_admin %}
+  <a href="/admin/users"       class="pp-nav-link">Usuários</a>
+  <a href="/admin/roles"       class="pp-nav-link">Perfis</a>
+  <a href="/admin/groups"      class="pp-nav-link">Grupos</a>
+  <a href="/admin/reports"     class="pp-nav-link">Relatórios</a>
+  <a href="/admin/permissions" class="pp-nav-link">Permissões</a>
+  <a href="/admin/logs"        class="pp-nav-link">Logs</a>
+  <a href="/admin/settings" class="pp-nav-link">Configurações</a>
+  {% endif %}
+  <a href="/logout" class="pp-nav-link">Sair</a>
+{% endblock %}
 
-    {% if user.is_admin %}
-    <div class="admin-bar">
-      <span>Administrador</span>
-      <a href="/admin/users" class="btn">Usuários</a>
-      <a href="/admin/roles" class="btn">Perfis</a>
-      <a href="/admin/groups" class="btn">Grupos</a>
-      <a href="/admin/reports" class="btn">Relatórios</a>
-      <a href="/admin/permissions" class="btn">Permissões extras</a>
-      <a href="/admin/logs" class="btn">Logs de acesso</a>
-    </div>
-    {% endif %}
+{% block extra_style %}
+<style>
+  {% set current_user = user %}
+  .pp-welcome { margin-bottom: 28px; }
+  .pp-welcome h1 { font-size: 22px; font-weight: 700; color: var(--pp-navy); }
+  .pp-welcome p  { font-size: 13px; color: var(--pp-gray500); margin-top: 5px; }
+  .pp-section-label {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 11px; font-weight: 700; color: var(--pp-gray500);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    margin-bottom: 14px;
+  }
+  .pp-section-label::after { content: ''; flex: 1; height: 1px; background: var(--pp-gray100); }
+  .pp-report-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-bottom: 32px; }
+  .pp-report-card {
+    background: #fff; border-radius: 10px; padding: 20px;
+    border: 1px solid var(--pp-gray100); text-decoration: none; color: inherit;
+    transition: all 0.15s; display: block;
+    box-shadow: 0 1px 3px rgba(13,27,42,0.04);
+  }
+  .pp-report-card:hover { border-color: var(--pp-accent); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(13,27,42,0.08); }
+  .pp-report-card-icon {
+    width: 38px; height: 38px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 12px; font-size: 18px;
+    background: var(--pp-ice);
+  }
+  .pp-report-card-name { font-size: 14px; font-weight: 600; color: var(--pp-navy); margin-bottom: 4px; }
+  .pp-report-card-desc { font-size: 12px; color: var(--pp-gray500); line-height: 1.5; }
+  .pp-group-icon {
+    width: 22px; height: 22px; background: var(--pp-ice);
+    border-radius: 5px; display: inline-flex; align-items: center;
+    justify-content: center;
+  }
+</style>
+{% endblock %}
 
-    {% if not groups_data and not loose_reports %}
-    <div class="empty">
-      <div style="font-size:48px">📋</div>
-      <p>Nenhum relatório disponível para seu usuário.</p>
-    </div>
-    {% endif %}
-
-    {% for item in groups_data %}
-    <div class="group-section">
-      <div class="group-header">
-        <div class="group-icon">📁</div>
-        <div>
-          <div class="group-name">{{ item.group.name }}</div>
-          {% if item.group.description %}
-          <div class="group-desc">{{ item.group.description }}</div>
-          {% endif %}
-        </div>
-      </div>
-      <div class="grid">
-        {% for report in item.reports %}
-        <a href="/report/{{ report.id }}" class="report-card">
-          <div class="report-icon">📊</div>
-          <div class="report-name">{{ report.name }}</div>
-          {% if report.description %}
-          <div class="report-desc">{{ report.description }}</div>
-          {% endif %}
-        </a>
-        {% endfor %}
-      </div>
-    </div>
-    {% endfor %}
-
-    {% if loose_reports %}
-      {% if groups_data %}<hr class="divider">{% endif %}
-      <div class="section-label">Outros relatórios</div>
-      <div class="grid">
-        {% for report in loose_reports %}
-        <a href="/report/{{ report.id }}" class="report-card">
-          <div class="report-icon">📊</div>
-          <div class="report-name">{{ report.name }}</div>
-          {% if report.description %}
-          <div class="report-desc">{{ report.description }}</div>
-          {% endif %}
-        </a>
-        {% endfor %}
-      </div>
-    {% endif %}
+{% block content %}
+{% set current_user = user %}
+<div class="pp-container">
+  <div class="pp-welcome">
+    <h1>Olá, {{ user.name.split()[0] }}</h1>
+    <p>
+      {% set weekdays = ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'] %}
+      {% set months = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'] %}
+      Bem-vindo ao portal de Business Intelligence
+      {% if client %} · {{ client.company_name }}{% endif %}
+    </p>
   </div>
-</body>
-</html>
+
+  {% if not groups_data and not loose_reports %}
+  <div class="pp-card" style="padding:60px;text-align:center">
+    <div style="font-size:40px;margin-bottom:12px">📋</div>
+    <div style="font-size:15px;font-weight:600;color:var(--pp-navy);margin-bottom:6px">Nenhum relatório disponível</div>
+    <div style="font-size:13px;color:var(--pp-gray500)">Aguarde a liberação de acesso pelo administrador.</div>
+  </div>
+  {% endif %}
+
+  {% for item in groups_data %}
+  <div class="pp-section-label">
+    <span class="pp-group-icon">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+        <rect x="1" y="1" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
+        <rect x="7.5" y="1" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
+        <rect x="1" y="7.5" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
+        <rect x="7.5" y="7.5" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
+      </svg>
+    </span>
+    {{ item.group.name }}
+  </div>
+  {% if item.group.description %}
+  <p style="font-size:12px;color:var(--pp-gray500);margin:-8px 0 14px">{{ item.group.description }}</p>
+  {% endif %}
+  <div class="pp-report-grid">
+    {% for report in item.reports %}
+    <a href="/report/{{ report.id }}" class="pp-report-card">
+      <div class="pp-report-card-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <rect x="3" y="11" width="3" height="7" rx="1" fill="#00A8CC"/>
+          <rect x="8.5" y="7" width="3" height="11" rx="1" fill="#1B4F8A"/>
+          <rect x="14" y="3" width="3" height="15" rx="1" fill="#0D1B2A"/>
+        </svg>
+      </div>
+      <div class="pp-report-card-name">{{ report.name }}</div>
+      {% if report.description %}
+      <div class="pp-report-card-desc">{{ report.description }}</div>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  {% if loose_reports %}
+  {% if groups_data %}
+  <div class="pp-section-label" style="margin-top:8px">Outros relatórios</div>
+  {% endif %}
+  <div class="pp-report-grid">
+    {% for report in loose_reports %}
+    <a href="/report/{{ report.id }}" class="pp-report-card">
+      <div class="pp-report-card-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <rect x="3" y="11" width="3" height="7" rx="1" fill="#00A8CC"/>
+          <rect x="8.5" y="7" width="3" height="11" rx="1" fill="#1B4F8A"/>
+          <rect x="14" y="3" width="3" height="15" rx="1" fill="#0D1B2A"/>
+        </svg>
+      </div>
+      <div class="pp-report-card-name">{{ report.name }}</div>
+      {% if report.description %}
+      <div class="pp-report-card-desc">{{ report.description }}</div>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

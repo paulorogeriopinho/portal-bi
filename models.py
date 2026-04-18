@@ -85,8 +85,16 @@ def init_models(db):
         expires_at = db.Column(db.DateTime, nullable=False)
         created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    class PortalSettings(db.Model):
+        __tablename__ = "portal_settings"
+        id         = db.Column(db.Integer, primary_key=True)
+        key        = db.Column(db.String(100), unique=True, nullable=False)
+        value      = db.Column(db.Text)
+        updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     return (User, Report, ReportRLS, Group, ReportGroup,
-            Permission, RolePermission, AccessLog, PasswordResetCode)
+            Permission, RolePermission, AccessLog,
+            PasswordResetCode, PortalSettings)
 
 def create_tables(db):
     db.create_all()

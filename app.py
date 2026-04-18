@@ -39,12 +39,33 @@ def unauthorized_callback(error):
 
 from models import init_models, create_tables
 (User, Report, ReportRLS, Group, ReportGroup,
- Permission, RolePermission, AccessLog, PasswordResetCode) = init_models(db)
+ Permission, RolePermission, AccessLog,
+ PasswordResetCode, PortalSettings) = init_models(db)
+
+def get_portal_settings():
+    """Retorna dict com todas as configurações do portal."""
+    rows = PortalSettings.query.all()
+    return {r.key: r.value for r in rows}
+
+@app.context_processor
+def inject_settings():
+    """Injeta as configurações em todos os templates."""
+    try:
+        settings = get_portal_settings()
+        return {"portal": settings}
+    except Exception:
+        return {"portal": {
+            "company_name": "Portal BI",
+            "company_logo": "",
+            "accent_color": "#00A8CC",
+            "portal_name":  "Portal BI"
+        }}
 
 from routes import init_routes
 init_routes(app, db, mail,
             User, Report, ReportRLS, Group, ReportGroup,
-            Permission, RolePermission, AccessLog, PasswordResetCode)
+            Permission, RolePermission, AccessLog,
+            PasswordResetCode, PortalSettings)
 
 if __name__ == "__main__":
     with app.app_context():

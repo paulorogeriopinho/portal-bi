@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Clientes{% endblock %}
+
+{% block nav_links %}
+  <a href="/dashboard"         class="pp-nav-link">Dashboard</a>
+  <a href="/admin/users"       class="pp-nav-link">Usuários</a>
+  <a href="/admin/roles"       class="pp-nav-link">Perfis</a>
+  <a href="/admin/groups"      class="pp-nav-link">Grupos</a>
+  <a href="/admin/reports"     class="pp-nav-link">Relatórios</a>
+  <a href="/admin/permissions" class="pp-nav-link">Permissões</a>
+  <a href="/admin/logs"        class="pp-nav-link">Logs</a>
+  <a href="/logout"            class="pp-nav-link">Sair</a>
+{% endblock %}
+
+{% block content %}
+{% set current_user = user %}
+<div class="pp-container">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+    <div class="pp-page-header" style="margin-bottom:0">
+      <div class="pp-page-title">Clientes</div>
+      <div class="pp-page-sub">Gerencie as empresas contratantes e sua identidade visual.</div>
+    </div>
+    <button class="pp-btn pp-btn-primary" onclick="ppOpenModal('modal-create')">+ Novo cliente</button>
+  </div>
+
+  <div class="pp-table-wrap">
+    <table class="pp-table">
+      <thead>
+        <tr>
+          <th>Empresa</th>
+          <th>Cor de destaque</th>
+          <th>Logo URL</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clients %}
+        <tr>
+          <td><strong>{{ c.company_name }}</strong></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="width:20px;height:20px;border-radius:5px;background:{{ c.accent_color }};border:1px solid rgba(0,0,0,0.1)"></div>
+              <span style="font-family:monospace;font-size:12px">{{ c.accent_color }}</span>
+            </div>
+          </td>
+          <td style="font-size:12px;color:var(--pp-gray500);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ c.logo_url or '—' }}
+          </td>
+          <td>
+            {% if c.active %}
+            <span class="pp-badge pp-badge-success">Ativo</span>
+            {% else %}
+            <span class="pp-badge pp-badge-danger">Inativo</span>
+            {% endif %}
+          </td>
+          <td>
+            <button class="pp-btn pp-btn-outline pp-btn-sm" onclick="openEdit(
+              {{ c.id }}, '{{ c.company_name }}',
+              '{{ c.logo_url or '' }}', '{{ c.accent_color }}',
+              {{ 'true' if c.active else 'false' }}
+            )">Editar</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal criar -->
+<div class="pp-modal-overlay" id="modal-create">
+  <div class="pp-modal">
+    <div class="pp-modal-header">
+      <div class="pp-modal-title">Novo cliente</div>
+      <div class="pp-modal-sub">Configure a identidade do cliente contratante.</div>
+    </div>
+    <form method="POST" action="/admin/clients/create">
+      <label class="pp-label">Nome da empresa</label>
+      <input class="pp-input" type="text" name="company_name" placeholder="Ex: Grupo MetroNorte" required autofocus>
+      <label class="pp-label">URL do logo <span style="color:var(--pp-gray300);font-weight:400">(opcional)</span></label>
+      <input class="pp-input" type="text" name="logo_url" placeholder="https://empresa.com/logo.png">
+      <p class="pp-hint">Recomendado: PNG ou SVG com fundo transparente, altura 28px.</p>
+      <label class="pp-label">Cor de destaque</label>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+        <input type="color" name="accent_color" value="#00A8CC"
+          style="width:44px;height:36px;border:1px solid var(--pp-gray300);border-radius:7px;cursor:pointer;padding:2px">
+        <span style="font-size:12px;color:var(--pp-gray500)">Cor usada nos botões e destaques do cliente</span>
+      </div>
+      <div class="pp-modal-actions">
+        <button type="button" class="pp-btn pp-btn-outline" onclick="ppCloseModal('modal-create')">Cancelar</button>
+        <button type="submit" class="pp-btn pp-btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal editar -->
+<div class="pp-modal-overlay" id="modal-edit">
+  <div class="pp-modal">
+    <div class="pp-modal-header">
+      <div class="pp-modal-title">Editar cliente</div>
+    </div>
+    <form method="POST" id="form-edit">
+      <label class="pp-label">Nome da empresa</label>
+      <input class="pp-input" type="text" name="company_name" id="edit-name" required>
+      <label class="pp-label">URL do logo</label>
+      <input class="pp-input" type="text" name="logo_url" id="edit-logo">
+      <label class="pp-label">Cor de destaque</label>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+        <input type="color" name="accent_color" id="edit-color"
+          style="width:44px;height:36px;border:1px solid var(--pp-gray300);border-radius:7px;cursor:pointer;padding:2px">
+      </div>
+      <div class="pp-checkbox-row">
+        <input type="checkbox" name="active" id="edit-active">
+        <label for="edit-active" style="margin:0;font-weight:400">Cliente ativo</label>
+      </div>
+      <div class="pp-modal-actions">
+        <button type="button" class="pp-btn pp-btn-outline" onclick="ppCloseModal('modal-edit')">Cancelar</button>
+        <button type="submit" class="pp-btn pp-btn-primary">Salvar alterações</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% block extra_script %}
+<script>
+  function openEdit(id, name, logo, color, active) {
+    document.getElementById('form-edit').action   = '/admin/clients/edit/' + id;
+    document.getElementById('edit-name').value    = name;
+    document.getElementById('edit-logo').value    = logo;
+    document.getElementById('edit-color').value   = color;
+    document.getElementById('edit-active').checked = active;
+    ppOpenModal('modal-edit');
+  }
+</script>
+{% endblock %}
+{% endblock %}

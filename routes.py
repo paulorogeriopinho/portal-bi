@@ -13,8 +13,9 @@ import string
 
 def init_routes(app, db, mail,
                 User, Report, ReportRLS, Group, ReportGroup,
-                Permission, RolePermission, AccessLog, PasswordResetCode):
-
+                Permission, RolePermission, AccessLog,
+                PasswordResetCode, PortalSettings):
+    
     # ── Helpers ──────────────────────────────────────────────────
 
     def get_user_reports(user):
@@ -236,6 +237,7 @@ def init_routes(app, db, mail,
             role            = data.get("role", "user"),
             empresa_revenda = data.get("empresa_revenda") or None,
             departamento    = data.get("departamento") or None,
+            client_id       = int(data["client_id"]) if data.get("client_id") else None,
             active          = True
         )
         db.session.add(new_user)
@@ -258,6 +260,7 @@ def init_routes(app, db, mail,
         u.departamento    = data.get("departamento") or None
         u.is_admin        = data.get("is_admin") == "on"
         u.active          = data.get("active") == "on"
+        u.client_id = int(data["client_id"]) if data.get("client_id") else None
         if data.get("password"):
             u.password_hash = hash_password(data["password"])
         db.session.commit()
@@ -742,3 +745,29 @@ def init_routes(app, db, mail,
             "groups":     groups_data,
             "reports":    reports_data
         })
+    
+    # ── Configurações do Portal ───────────────────────────────────
+
+    @app.route("/admin/settings", methods=["GET", "POST"])
+    @jwt_required()
+    def admin_settings():
+        user_id = int(get_jwt_identity())
+        user    = User.query.get(user_id)
+        if not user.is_admin:
+            return redirect(url_for("dashboard"))
+
+        if request.method == "POST":
+            data = request.form
+            keys = ["company_name", "company_logo", "accent_color", "portal_name"]
+            for key in keys:
+                setting = PortalSettings.query.filter_by(key=key).first()
+                if setting:
+                    setting.value      = data.get(key, "")
+                    setting.updated_at = datetime.utcnow()
+                else:
+                    db.session.add(PortalSettings(key=key, value=data.get(key, "")))
+            db.session.commit()
+            return redirect(url_for("admin_settings"))
+
+        settings = {s.key: s.value for s in PortalSettings.query.all()}
+        return render_template("admin_settings.html", user=user, settings=settings)

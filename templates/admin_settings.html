@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}Configurações{% endblock %}
+
+{% block nav_links %}
+  <a href="/dashboard"         class="pp-nav-link">Dashboard</a>
+  <a href="/admin/users"       class="pp-nav-link">Usuários</a>
+  <a href="/admin/roles"       class="pp-nav-link">Perfis</a>
+  <a href="/admin/groups"      class="pp-nav-link">Grupos</a>
+  <a href="/admin/reports"     class="pp-nav-link">Relatórios</a>
+  <a href="/admin/permissions" class="pp-nav-link">Permissões</a>
+  <a href="/admin/logs"        class="pp-nav-link">Logs</a>
+  <a href="/logout"            class="pp-nav-link">Sair</a>
+{% endblock %}
+
+{% block extra_style %}
+<style>
+  {% set current_user = user %}
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .settings-card { background: #fff; border-radius: 10px; border: 1px solid var(--pp-gray100); padding: 24px; }
+  .settings-card-title { font-size: 14px; font-weight: 700; color: var(--pp-navy); margin-bottom: 4px; }
+  .settings-card-sub { font-size: 12px; color: var(--pp-gray500); margin-bottom: 20px; }
+  .preview-nav {
+    background: var(--pp-navy); border-radius: 8px; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 3px solid var(--pp-accent);
+  }
+  .preview-nav-left { display: flex; align-items: center; gap: 10px; }
+  .preview-logo { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+  .preview-brand-name { font-size: 12px; font-weight: 700; color: #fff; }
+  .preview-brand-sub  { font-size: 9px; color: #aaa; }
+  .preview-divider { width: 1px; height: 22px; background: rgba(255,255,255,0.15); }
+  .preview-company { font-size: 11px; color: rgba(255,255,255,0.6); }
+  .preview-dot { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: var(--pp-navy); }
+  .preview-login {
+    background: var(--pp-navy); border-radius: 8px; padding: 16px;
+    text-align: center; border-bottom: 3px solid var(--pp-accent);
+  }
+  .preview-login-logo { width: 36px; height: 36px; border-radius: 8px; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; }
+  .preview-login-title { font-size: 13px; font-weight: 700; color: #fff; }
+  .preview-login-sub { font-size: 10px; margin-top: 2px; }
+  .preview-login-client { font-size: 9px; color: rgba(255,255,255,0.4); margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); }
+  .color-row { display: flex; gap: 10px; align-items: center; }
+  .color-row input[type=color] { width: 44px; height: 36px; border: 1px solid var(--pp-gray300); border-radius: 7px; cursor: pointer; padding: 2px; }
+  .color-row input[type=text] { flex: 1; margin-bottom: 0; }
+  .save-bar {
+    position: sticky; bottom: 0;
+    background: #fff; border-top: 1px solid var(--pp-gray100);
+    padding: 14px 24px; margin: 24px -24px -24px;
+    border-radius: 0 0 10px 10px;
+    display: flex; justify-content: flex-end; gap: 10px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set current_user = user %}
+<div class="pp-container">
+  <div class="pp-page-header">
+    <div class="pp-page-title">Configurações do portal</div>
+    <div class="pp-page-sub">Personalize a identidade visual deste ambiente para o cliente.</div>
+  </div>
+
+  <form method="POST" action="/admin/settings" id="settings-form">
+    <div class="settings-grid">
+
+      <!-- Coluna esquerda: formulário -->
+      <div class="settings-card">
+        <div class="settings-card-title">Identidade do cliente</div>
+        <div class="settings-card-sub">Informações exibidas na navegação e tela de login.</div>
+
+        <label class="pp-label">Nome da empresa</label>
+        <input class="pp-input" type="text" name="company_name"
+          id="input-company" value="{{ settings.get('company_name', '') }}"
+          placeholder="Ex: Grupo MetroNorte" oninput="updatePreview()">
+
+        <label class="pp-label">Nome do portal</label>
+        <input class="pp-input" type="text" name="portal_name"
+          id="input-portal" value="{{ settings.get('portal_name', '') }}"
+          placeholder="Ex: Portal BI MetroNorte" oninput="updatePreview()">
+
+        <label class="pp-label">URL do logo <span style="color:var(--pp-gray300);font-weight:400">(opcional)</span></label>
+        <input class="pp-input" type="text" name="company_logo"
+          id="input-logo" value="{{ settings.get('company_logo', '') }}"
+          placeholder="https://empresa.com/logo.png" oninput="updatePreview()">
+        <p class="pp-hint">PNG ou SVG com fundo transparente. Altura ideal: 24px.</p>
+
+        <label class="pp-label">Cor de destaque</label>
+        <div class="color-row" style="margin-bottom:14px">
+          <input type="color" id="color-picker"
+            value="{{ settings.get('accent_color', '#00A8CC') }}"
+            oninput="syncColor(this.value)">
+          <input class="pp-input" type="text" name="accent_color" id="input-color"
+            value="{{ settings.get('accent_color', '#00A8CC') }}"
+            placeholder="#00A8CC" oninput="syncColorFromText(this.value)" maxlength="7">
+        </div>
+        <p class="pp-hint" style="margin-top:-10px">Usada nos botões, bordas e destaques do portal.</p>
+
+        <div class="save-bar">
+          <a href="/dashboard" class="pp-btn pp-btn-outline">Cancelar</a>
+          <button type="submit" class="pp-btn pp-btn-primary">Salvar configurações</button>
+        </div>
+      </div>
+
+      <!-- Coluna direita: preview -->
+      <div>
+        <div class="settings-card" style="margin-bottom:16px">
+          <div class="settings-card-title">Preview — Navegação</div>
+          <div class="settings-card-sub">Como aparece no topo do portal.</div>
+          <div class="preview-nav" id="preview-nav">
+            <div class="preview-nav-left">
+              <div class="preview-logo" id="preview-logo-box">
+                <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
+                  <rect x="2" y="9" width="3.5" height="7" rx="1" id="icon-bar1"/>
+                  <rect x="7" y="6" width="3.5" height="10" rx="1" id="icon-bar2"/>
+                  <rect x="12" y="2" width="3.5" height="14" rx="1" id="icon-bar3"/>
+                </svg>
+              </div>
+              <div>
+                <div class="preview-brand-name">Paulo Pinho</div>
+                <div class="preview-brand-sub" id="preview-sub">Business Intelligence</div>
+              </div>
+              <div class="preview-divider"></div>
+              <div id="preview-company-nav" class="preview-company">{{ settings.get('company_name', '') }}</div>
+            </div>
+            <div class="preview-dot" id="preview-dot">PP</div>
+          </div>
+        </div>
+
+        <div class="settings-card">
+          <div class="settings-card-title">Preview — Login</div>
+          <div class="settings-card-sub">Como aparece na tela de entrada.</div>
+          <div class="preview-login" id="preview-login">
+            <div class="preview-login-logo" id="preview-login-logo">
+              <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
+                <rect x="2" y="9" width="3.5" height="7" rx="1" id="login-bar1"/>
+                <rect x="7" y="6" width="3.5" height="10" rx="1" id="login-bar2"/>
+                <rect x="12" y="2" width="3.5" height="14" rx="1" id="login-bar3"/>
+              </svg>
+            </div>
+            <div class="preview-login-title" id="preview-portal-name">{{ settings.get('portal_name', 'Portal BI') }}</div>
+            <div class="preview-login-sub" id="preview-login-sub">Business Intelligence Portal</div>
+            <div class="preview-login-client" id="preview-login-company">Portal exclusivo · {{ settings.get('company_name', '') }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+{% block extra_script %}
+<script>
+  function updatePreview() {
+    var company = document.getElementById('input-company').value || '';
+    var portal  = document.getElementById('input-portal').value  || 'Portal BI';
+    var logo    = document.getElementById('input-logo').value    || '';
+    var color   = document.getElementById('input-color').value   || '#00A8CC';
+
+    document.getElementById('preview-company-nav').textContent  = company;
+    document.getElementById('preview-portal-name').textContent  = portal;
+    document.getElementById('preview-login-company').textContent = company ? 'Portal exclusivo · ' + company : '';
+
+    applyColor(color);
+
+    if (logo) {
+      document.getElementById('preview-company-nav').innerHTML =
+        '<img src="' + logo + '" style="height:14px;opacity:0.7" onerror="this.style.display=\'none\'">';
+    }
+  }
+
+  function applyColor(color) {
+    if (!/^#[0-9A-Fa-f]{6}$/.test(color)) return;
+
+    ['preview-logo-box', 'preview-dot', 'preview-login-logo'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.background = color;
+    });
+
+    ['icon-bar1','icon-bar2','icon-bar3','login-bar1','login-bar2','login-bar3'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.style.fill = '#0D1B2A';
+    });
+
+    document.getElementById('preview-nav').style.borderBottomColor   = color;
+    document.getElementById('preview-login').style.borderBottomColor = color;
+    document.getElementById('preview-login-sub').style.color         = color;
+  }
+
+  function syncColor(val) {
+    document.getElementById('input-color').value = val;
+    updatePreview();
+  }
+
+  function syncColorFromText(val) {
+    if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+      document.getElementById('color-picker').value = val;
+      updatePreview();
+    }
+  }
+
+  updatePreview();
+</script>
+{% endblock %}
+{% endblock %}
