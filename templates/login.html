@@ -62,8 +62,12 @@
       </div>
     </div>
   </div>
-  <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--pp-gray300)">
+  <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--pp-gray300)">
     Acesso restrito · Rede interna
+  </div>
+  <div style="text-align:center;margin-top:6px;font-size:11px;color:var(--pp-gray300)">
+    Powered by <a href="#" style="color:var(--pp-cyan);text-decoration:none">Paulo Pinho BI</a>
+    {% if portal.company_name %} · {{ portal.company_name }}{% endif %}
   </div>
 </div>
 {% endblock %}

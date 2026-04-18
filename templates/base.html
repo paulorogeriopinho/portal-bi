@@ -195,25 +195,40 @@
   <div class="pp-nav-left">
     <div class="pp-nav-logo" style="background: {{ portal.accent_color or '#00A8CC' }}">
       <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="2" y="9"  width="3.5" height="7"  rx="1" fill="#0D1B2A"/>
-        <rect x="7" y="6"  width="3.5" height="10" rx="1" fill="#0D1B2A"/>
+        <rect x="2"  y="9" width="3.5" height="7"  rx="1" fill="#0D1B2A"/>
+        <rect x="7"  y="6" width="3.5" height="10" rx="1" fill="#0D1B2A"/>
         <rect x="12" y="2" width="3.5" height="14" rx="1" fill="#0D1B2A"/>
       </svg>
     </div>
-    <div class="pp-nav-brand">
-      <span class="pp-nav-brand-name">Paulo Pinho</span>
-      <span class="pp-nav-brand-sub">Business Intelligence</span>
-    </div>
-    <!-- Nome/logo do cliente na nav -->
-    {% if portal.company_logo %}
-    <div class="pp-nav-client-logo">
-      <img src="{{ portal.company_logo }}" alt="{{ portal.company_name }}">
-    </div>
-    {% elif portal.company_name %}
-    <div class="pp-nav-divider"></div>
-    <span class="pp-nav-client-name">{{ portal.company_name }}</span>
+
+    {% if portal.white_label == 'true' and portal.company_name %}
+      <!-- Modo white label: mostra só a empresa -->
+      <div class="pp-nav-brand">
+        <span class="pp-nav-brand-name">{{ portal.company_name }}</span>
+        <span class="pp-nav-brand-sub">Business Intelligence</span>
+      </div>
+    {% else %}
+      <!-- Modo padrão: mostra Paulo Pinho + empresa -->
+      <div class="pp-nav-brand">
+        <span class="pp-nav-brand-name">Paulo Pinho</span>
+        <span class="pp-nav-brand-sub">Business Intelligence</span>
+      </div>
+      {% if portal.company_name %}
+      <div class="pp-nav-divider"></div>
+      <div class="pp-nav-client">
+        {% if portal.company_logo %}
+        <div class="pp-nav-client-logo">
+          <img src="{{ portal.company_logo }}" alt="{{ portal.company_name }}"
+               style="height:16px;object-fit:contain">
+        </div>
+        {% else %}
+        <span class="pp-nav-client-name">{{ portal.company_name }}</span>
+        {% endif %}
+      </div>
+      {% endif %}
     {% endif %}
   </div>
+
   <div class="pp-nav-right">
     {% block nav_links %}{% endblock %}
     {% if current_user is defined %}

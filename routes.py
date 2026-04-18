@@ -758,7 +758,7 @@ def init_routes(app, db, mail,
 
         if request.method == "POST":
             data = request.form
-            keys = ["company_name", "company_logo", "accent_color", "portal_name"]
+            keys = ["company_name", "company_logo", "accent_color", "portal_name", "white_label"]
             for key in keys:
                 setting = PortalSettings.query.filter_by(key=key).first()
                 if setting:

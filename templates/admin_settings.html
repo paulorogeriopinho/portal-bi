@@ -94,7 +94,23 @@
             placeholder="#00A8CC" oninput="syncColorFromText(this.value)" maxlength="7">
         </div>
         <p class="pp-hint" style="margin-top:-10px">Usada nos botões, bordas e destaques do portal.</p>
-
+        
+        <div style="border-top:1px solid var(--pp-gray100);padding-top:16px;margin-top:4px">
+          <div class="settings-card-title" style="margin-bottom:4px">Modo white label</div>
+          <div class="settings-card-sub" style="margin-bottom:14px">
+            Oculta o nome "Paulo Pinho" da barra de navegação. Seu nome continua no rodapé de todas as páginas.
+          </div>
+          <div class="pp-checkbox-row">
+            <input type="checkbox" name="white_label" id="white-label-check"
+              value="true"
+              {% if settings.get('white_label') == 'true' %}checked{% endif %}
+              onchange="updatePreview()">
+            <label for="white-label-check" style="margin:0;font-weight:400">
+              Ativar white label — exibir apenas o nome da empresa na navegação
+            </label>
+          </div>
+        </div>
+        
         <div class="save-bar">
           <a href="/dashboard" class="pp-btn pp-btn-outline">Cancelar</a>
           <button type="submit" class="pp-btn pp-btn-primary">Salvar configurações</button>
@@ -116,8 +132,8 @@
                 </svg>
               </div>
               <div>
-                <div class="preview-brand-name">Paulo Pinho</div>
-                <div class="preview-brand-sub" id="preview-sub">Business Intelligence</div>
+                <div class="preview-brand-name" id="preview-brand-name">Paulo Pinho</div>
+                <div class="preview-brand-sub"  id="preview-brand-sub">Business Intelligence</div>
               </div>
               <div class="preview-divider"></div>
               <div id="preview-company-nav" class="preview-company">{{ settings.get('company_name', '') }}</div>
@@ -155,6 +171,15 @@
     var logo    = document.getElementById('input-logo').value    || '';
     var color   = document.getElementById('input-color').value   || '#00A8CC';
 
+    var whiteLabelCheck = document.getElementById('white-label-check');
+    var isWhiteLabel    = whiteLabelCheck && whiteLabelCheck.checked;
+    var brandName       = document.getElementById('preview-brand-name');
+    var brandSub        = document.getElementById('preview-brand-sub');
+
+    if (brandName) {
+      brandName.textContent = isWhiteLabel && company ? company : 'Paulo Pinho';
+    }
+
     document.getElementById('preview-company-nav').textContent  = company;
     document.getElementById('preview-portal-name').textContent  = portal;
     document.getElementById('preview-login-company').textContent = company ? 'Portal exclusivo · ' + company : '';
@@ -183,6 +208,7 @@
     document.getElementById('preview-nav').style.borderBottomColor   = color;
     document.getElementById('preview-login').style.borderBottomColor = color;
     document.getElementById('preview-login-sub').style.color         = color;
+    
   }
 
   function syncColor(val) {
