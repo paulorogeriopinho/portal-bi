@@ -185,6 +185,28 @@
       margin-top: 40px;
     }
     .pp-footer a { color: var(--pp-cyan); text-decoration: none; }
+    /* NAV LINKS com indicador de página ativa */
+    .pp-nav-link {
+      font-size: 12px; color: rgba(255,255,255,0.5);
+      text-decoration: none; transition: color 0.15s;
+      padding: 4px 2px; position: relative; white-space: nowrap;
+    }
+    .pp-nav-link:hover { color: rgba(255,255,255,0.9); }
+    .pp-nav-link.active {
+      color: #fff;
+      font-weight: 600;
+    }
+    .pp-nav-link.active::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--pp-accent);
+    }
   </style>
   {% block extra_style %}{% endblock %}
 </head>
@@ -202,13 +224,11 @@
     </div>
 
     {% if portal.white_label == 'true' and portal.company_name %}
-      <!-- Modo white label: mostra só a empresa -->
       <div class="pp-nav-brand">
         <span class="pp-nav-brand-name">{{ portal.company_name }}</span>
         <span class="pp-nav-brand-sub">Business Intelligence</span>
       </div>
     {% else %}
-      <!-- Modo padrão: mostra Paulo Pinho + empresa -->
       <div class="pp-nav-brand">
         <span class="pp-nav-brand-name">Paulo Pinho</span>
         <span class="pp-nav-brand-sub">Business Intelligence</span>
@@ -218,8 +238,7 @@
       <div class="pp-nav-client">
         {% if portal.company_logo %}
         <div class="pp-nav-client-logo">
-          <img src="{{ portal.company_logo }}" alt="{{ portal.company_name }}"
-               style="height:16px;object-fit:contain">
+          <img src="{{ portal.company_logo }}" alt="{{ portal.company_name }}" style="height:16px;object-fit:contain">
         </div>
         {% else %}
         <span class="pp-nav-client-name">{{ portal.company_name }}</span>

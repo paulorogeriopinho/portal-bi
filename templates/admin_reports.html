@@ -1,165 +1,119 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-  <meta charset="UTF-8">
-  <title>Relatórios — Portal BI</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; }
-    nav {
-      background: #1a1a2e; color: #fff; padding: 0 32px; height: 56px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    nav .brand { font-size: 16px; font-weight: 600; }
-    nav .nav-right { display: flex; gap: 20px; align-items: center; }
-    nav a { color: #aaa; text-decoration: none; font-size: 13px; }
-    nav a:hover { color: #fff; }
-    .container { max-width: 1100px; margin: 40px auto; padding: 0 24px; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    .header h1 { font-size: 20px; font-weight: 600; color: #1a1a2e; }
-    .btn { padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: none; border: none; display: inline-block; }
-    .btn-primary { background: #4f46e5; color: #fff; }
-    .btn-primary:hover { background: #4338ca; }
-    .btn-outline { border: 1px solid #ddd; background: #fff; color: #444; }
-    .btn-outline:hover { background: #f5f5f5; }
-    .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-    .btn-danger:hover { background: #fee2e2; }
-    .btn-rls { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
-    .btn-rls:hover { background: #ddd6fe; }
-    .btn-sm { padding: 6px 12px; font-size: 12px; }
-    .report-card {
-      background: #fff; border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      border: 1px solid #eee; margin-bottom: 16px;
-      overflow: hidden;
-    }
-    .report-card-header {
-      padding: 18px 20px;
-      display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    }
-    .report-info { flex: 1; min-width: 0; }
-    .report-name { font-size: 15px; font-weight: 600; color: #1a1a2e; }
-    .report-meta { font-size: 12px; color: #888; margin-top: 3px; display: flex; gap: 12px; flex-wrap: wrap; }
-    .actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
-    .badge-active   { background: #f0fdf4; color: #166534; }
-    .badge-inactive { background: #fef2f2; color: #dc2626; }
-    .badge-rls      { background: #ede9fe; color: #5b21b6; }
-    .badge-no-rls   { background: #f1f5f9; color: #94a3b8; }
-    .mono { font-family: monospace; font-size: 11px; color: #888; }
-    /* RLS Panel */
-    .rls-panel { display: none; border-top: 1px solid #f0f0f0; background: #faf5ff; }
-    .rls-panel.open { display: block; }
-    .rls-panel-header {
-      padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
-      border-bottom: 1px solid #ede9fe;
-    }
-    .rls-panel-title { font-size: 13px; font-weight: 600; color: #6d28d9; }
-    .rls-rules { padding: 0 20px 16px; }
-    .rls-rule-row {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 0; border-bottom: 1px solid #ede9fe;
-    }
-    .rls-rule-row:last-child { border-bottom: none; }
-    .rls-rule-info { flex: 1; }
-    .rls-rule-name { font-size: 13px; font-weight: 600; color: #1a1a2e; }
-    .rls-rule-detail { font-size: 12px; color: #888; margin-top: 2px; }
-    .rls-empty { padding: 16px 0; font-size: 13px; color: #aaa; text-align: center; }
-    /* Modais */
-    .modal-overlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.45); z-index: 100;
-      align-items: flex-start; justify-content: center;
-      padding: 40px 16px; overflow-y: auto;
-    }
-    .modal-overlay.active { display: flex; }
-    .modal {
-      background: #fff; border-radius: 12px; padding: 36px 32px;
-      width: 100%; max-width: 520px; box-shadow: 0 8px 40px rgba(0,0,0,0.15);
-      margin: auto;
-    }
-    .modal h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; color: #1a1a2e; }
-    .modal-sub { font-size: 13px; color: #888; margin-bottom: 24px; }
-    label { display: block; font-size: 13px; font-weight: 500; color: #444; margin-bottom: 6px; }
-    input[type=text], input[type=email], input[type=password], textarea, select {
-      width: 100%; padding: 10px 14px; border: 1px solid #ddd;
-      border-radius: 8px; font-size: 14px; margin-bottom: 16px;
-      outline: none; font-family: inherit; background: #fff;
-    }
-    input:focus, textarea:focus, select:focus { border-color: #4f46e5; }
-    textarea { resize: vertical; min-height: 60px; }
-    .hint { font-size: 12px; color: #aaa; margin-top: -12px; margin-bottom: 16px; }
-    .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
-    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
-    .rls-modal-header { background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
-    .rls-modal-header p { font-size: 13px; color: #6d28d9; font-weight: 500; }
-    .rls-modal-header small { font-size: 12px; color: #888; }
-    .empty { text-align: center; padding: 60px 20px; color: #aaa; }
-  </style>
-</head>
-<body>
-  <nav>
-    <span class="brand">Portal BI</span>
-    <div class="nav-right">
-      <a href="/dashboard">Dashboard</a>
-      <a href="/admin/users">Usuários</a>
-      <a href="/admin/groups">Grupos</a>
-      <a href="/admin/permissions">Permissões</a>
-      <a href="/admin/logs">Logs</a>
-      <a href="/logout">Sair</a>
-    </div>
-  </nav>
+{% extends "base.html" %}
+{% block title %}Relatórios{% endblock %}
+{% block nav_links %}{% include "nav_admin.html" %}{% endblock %}
 
-  <div class="container">
-    <div class="header">
-      <h1>Relatórios</h1>
-      <button class="btn btn-primary" onclick="openModal('modal-create')">+ Novo relatório</button>
-    </div>
+{% block extra_style %}
+<style>
+  {% set current_user = user %}
+  .report-card {
+    background: #fff; border-radius: 10px;
+    border: 1px solid var(--pp-gray100);
+    margin-bottom: 14px; overflow: hidden;
+    box-shadow: 0 1px 4px rgba(13,27,42,0.04);
+  }
+  .report-card-header {
+    padding: 16px 20px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .report-info { flex: 1; min-width: 0; }
+  .report-name { font-size: 14px; font-weight: 700; color: var(--pp-navy); }
+  .report-meta { font-size: 12px; color: var(--pp-gray500); margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .actions-row { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+  .rls-panel { display: none; border-top: 1px solid var(--pp-gray100); background: var(--pp-surface); }
+  .rls-panel.open { display: block; }
+  .rls-panel-header {
+    padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--pp-gray100);
+  }
+  .rls-panel-title { font-size: 12px; font-weight: 700; color: var(--pp-blue); text-transform: uppercase; letter-spacing: 0.4px; }
+  .rls-rules { padding: 0 20px 12px; }
+  .rls-rule-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--pp-gray100);
+  }
+  .rls-rule-row:last-child { border-bottom: none; }
+  .rls-rule-info { flex: 1; }
+  .rls-rule-name   { font-size: 13px; font-weight: 600; color: var(--pp-navy); }
+  .rls-rule-detail { font-size: 11px; color: var(--pp-gray500); margin-top: 2px; }
+  .rls-empty { padding: 16px 0; font-size: 13px; color: var(--pp-gray300); text-align: center; }
+  .pp-btn-rls { background: var(--pp-ice); color: var(--pp-blue); border: 1px solid #BFDBFE; }
+  .pp-btn-rls:hover { background: #BFDBFE; }
+  .rls-modal-banner {
+    background: var(--pp-ice); border: 1px solid #BFDBFE;
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 20px;
+  }
+  .rls-modal-banner p { font-size: 13px; color: var(--pp-blue); font-weight: 600; }
+  .rls-modal-banner small { font-size: 11px; color: var(--pp-gray500); }
+</style>
+{% endblock %}
 
-    {% if reports %}
-      {% for r in reports %}
-      <div class="report-card">
-        <div class="report-card-header">
-          <div class="report-info">
-            <div class="report-name">{{ r.name }}</div>
-            <div class="report-meta">
-              <span class="mono">{{ r.report_id[:8] }}...</span>
-              <span>{% if r.active %}<span class="badge badge-active">Ativo</span>{% else %}<span class="badge badge-inactive">Inativo</span>{% endif %}</span>
-              <span>{% if r.has_rls %}<span class="badge badge-rls">🔒 RLS ({{ r.rls_list|length }} regra{{ 's' if r.rls_list|length != 1 }})</span>{% else %}<span class="badge badge-no-rls">Sem RLS</span>{% endif %}</span>
-              <span style="color:#ccc">criado {{ r.created_at.strftime('%d/%m/%Y') }}</span>
-            </div>
-          </div>
-          <div class="actions">
-            <button class="btn btn-outline btn-sm" onclick="openEdit(
-              {{ r.id }},'{{ r.name }}','{{ r.description or '' }}',
-              '{{ r.report_id }}','{{ r.workspace_id }}',
-              {{ 'true' if r.has_rls else 'false' }})">Editar</button>
-            <button class="btn btn-rls btn-sm" onclick="toggleRLS({{ r.id }})">
-              🔒 RLS ({{ r.rls_list|length }})
-            </button>
-            <form method="POST" action="/admin/reports/toggle/{{ r.id }}" style="display:inline">
-              <button class="btn btn-outline btn-sm">
-                {% if r.active %}Desativar{% else %}Ativar{% endif %}
-              </button>
-            </form>
-            <form method="POST" action="/admin/reports/delete/{{ r.id }}" style="display:inline"
-              onsubmit="return confirm('Excluir este relatório?')">
-              <button class="btn btn-danger btn-sm">Excluir</button>
-            </form>
+{% block content %}
+{% set current_user = user %}
+<div class="pp-container">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+    <div>
+      <div class="pp-page-title">Relatórios</div>
+      <div class="pp-page-sub">Gerencie os relatórios do Power BI disponíveis no portal.</div>
+    </div>
+    <button class="pp-btn pp-btn-primary" onclick="ppOpenModal('modal-create')">+ Novo relatório</button>
+  </div>
+
+  {% if reports %}
+    {% for r in reports %}
+    <div class="report-card">
+      <div class="report-card-header">
+        <div class="report-info">
+          <div class="report-name">{{ r.name }}</div>
+          <div class="report-meta">
+            <span style="font-family:monospace;font-size:11px;background:var(--pp-gray100);padding:2px 7px;border-radius:5px">{{ r.report_id[:8] }}...</span>
+            {% if r.active %}
+              <span class="pp-badge pp-badge-success">Ativo</span>
+            {% else %}
+              <span class="pp-badge pp-badge-danger">Inativo</span>
+            {% endif %}
+            {% if r.has_rls %}
+              <span class="pp-badge pp-badge-rls">🔒 RLS ({{ r.rls_list|length }})</span>
+            {% else %}
+              <span class="pp-badge pp-badge-gray">Sem RLS</span>
+            {% endif %}
+            {% if r.description %}
+            <span style="color:var(--pp-gray500)">{{ r.description }}</span>
+            {% endif %}
           </div>
         </div>
-
-        <!-- Painel RLS expansível -->
-        <div class="rls-panel" id="rls-panel-{{ r.id }}">
-          <div class="rls-panel-header">
-            <span class="rls-panel-title">🔒 Regras de Row Level Security</span>
-            <button class="btn btn-rls btn-sm"
-              onclick="openRLSForm({{ r.id }}, '{{ r.name }}', 0, '', 'gerente', '', 'empresa_revenda', '')">
-              + Nova regra
+        <div class="actions-row">
+          <button class="pp-btn pp-btn-outline pp-btn-sm" onclick="openEdit(
+            {{ r.id }},'{{ r.name }}','{{ r.description or '' }}',
+            '{{ r.report_id }}','{{ r.workspace_id }}',
+            {{ 'true' if r.has_rls else 'false' }})">
+            Editar
+          </button>
+          <button class="pp-btn pp-btn-rls pp-btn-sm" onclick="toggleRLS({{ r.id }})">
+            🔒 RLS ({{ r.rls_list|length }})
+          </button>
+          <form method="POST" action="/admin/reports/toggle/{{ r.id }}" style="display:inline">
+            <button class="pp-btn pp-btn-outline pp-btn-sm">
+              {% if r.active %}Desativar{% else %}Ativar{% endif %}
             </button>
-          </div>
+          </form>
+          <form method="POST" action="/admin/reports/delete/{{ r.id }}" style="display:inline"
+            onsubmit="return confirm('Excluir este relatório e todas as permissões associadas?')">
+            <button class="pp-btn pp-btn-danger pp-btn-sm">Excluir</button>
+          </form>
+        </div>
+      </div>
 
-          <!-- Aviso sobre filtro duplo -->
+      <!-- Painel RLS expansível -->
+      <div class="rls-panel" id="rls-panel-{{ r.id }}">
+        <div class="rls-panel-header">
+          <span class="rls-panel-title">🔒 Regras de Row Level Security</span>
+          <button class="pp-btn pp-btn-rls pp-btn-sm"
+            onclick="openRLSForm({{ r.id }},'{{ r.name }}',0,'','gerente','','empresa_revenda','')">
+            + Nova regra
+          </button>
+        </div>
+
+        <!-- Aviso sobre filtro duplo -->
           {% if r.rls_list|length > 1 %}
           <div style="background:#fffbeb;border-bottom:1px solid #fde68a;padding:10px 20px;font-size:12px;color:#92400e;display:flex;align-items:flex-start;gap:8px">
             <span style="flex-shrink:0">⚠️</span>
@@ -174,200 +128,176 @@
           </div>
           {% endif %}
 
-          <div class="rls-rules">
-            {% if r.rls_list %}
-              {% for rls in r.rls_list %}
-              <div class="rls-rule-row">
-                <div class="rls-rule-info">
-                  <div class="rls-rule-name">{{ rls.rule_name or 'Regra ' ~ loop.index }}</div>
-                  <div class="rls-rule-detail">
-                    Aplica a: <strong>{{ rls.system_role }}</strong> ·
-                    Role Power BI: <strong>{{ rls.role_name }}</strong> ·
-                    Filtro: <strong>{{ rls.filter_source }}</strong>
-                    {% if rls.description %} · {{ rls.description }}{% endif %}
-                  </div>
+        <div class="rls-rules">
+          {% if r.rls_list %}
+            {% for rls in r.rls_list %}
+            <div class="rls-rule-row">
+              <div class="rls-rule-info">
+                <div class="rls-rule-name">{{ rls.rule_name or 'Regra ' ~ loop.index }}</div>
+                <div class="rls-rule-detail">
+                  Aplica a: <strong>{{ rls.system_role }}</strong> ·
+                  Role Power BI: <strong>{{ rls.role_name }}</strong> ·
+                  Filtro: <strong>{{ rls.filter_source }}</strong>
+                  {% if rls.description %} · {{ rls.description }}{% endif %}
                 </div>
-                <!-- Botão editar em cada regra -->
-                <button class="btn btn-outline btn-sm" onclick="openRLSForm(
-                  {{ r.id }}, '{{ r.name }}',
-                  {{ rls.id }},
-                  '{{ rls.rule_name or '' }}',
-                  '{{ rls.system_role }}',
-                  '{{ rls.role_name }}',
-                  '{{ rls.filter_source }}',
-                  '{{ rls.description or '' }}'
-                )">Editar</button>
-                <form method="POST"
-                  action="/admin/reports/{{ r.id }}/rls/{{ rls.id }}/delete"
-                  style="display:inline"
-                  onsubmit="return confirm('Excluir esta regra RLS?')">
-                  <button class="btn btn-danger btn-sm">Excluir</button>
-                </form>
               </div>
-              {% endfor %}
-            {% else %}
-              <div class="rls-empty">Nenhuma regra cadastrada. Clique em "+ Nova regra" para adicionar.</div>
-            {% endif %}
-          </div>
+              <button class="pp-btn pp-btn-outline pp-btn-sm" onclick="openRLSForm(
+                {{ r.id }},'{{ r.name }}',
+                {{ rls.id }},'{{ rls.rule_name or '' }}',
+                '{{ rls.system_role }}','{{ rls.role_name }}',
+                '{{ rls.filter_source }}','{{ rls.description or '' }}'
+              )">Editar</button>
+              <form method="POST" action="/admin/reports/{{ r.id }}/rls/{{ rls.id }}/delete"
+                style="display:inline" onsubmit="return confirm('Excluir esta regra RLS?')">
+                <button class="pp-btn pp-btn-danger pp-btn-sm">Excluir</button>
+              </form>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="rls-empty">Nenhuma regra cadastrada. Clique em "+ Nova regra" para adicionar.</div>
+          {% endif %}
         </div>
       </div>
-      {% endfor %}
-    {% else %}
-    <div class="empty">
-      <div style="font-size:48px">📊</div>
-      <p style="margin-top:12px">Nenhum relatório cadastrado ainda.</p>
     </div>
-    {% endif %}
+    {% endfor %}
+  {% else %}
+  <div class="pp-empty">
+    <div class="pp-empty-icon">📊</div>
+    <div>Nenhum relatório cadastrado ainda.</div>
   </div>
+  {% endif %}
+</div>
 
-  <!-- Modal criar relatório -->
-  <div class="modal-overlay" id="modal-create">
-    <div class="modal">
-      <h2>Novo relatório</h2>
-      <p class="modal-sub">Cole os IDs encontrados na URL do relatório no Power BI.</p>
-      <form method="POST" action="/admin/reports/create">
-        <label>Nome do relatório</label>
-        <input type="text" name="name" placeholder="Ex: Vendas por Revenda" required autofocus>
-        <label>Descrição <span style="color:#aaa;font-weight:400">(opcional)</span></label>
-        <textarea name="description" placeholder="Breve descrição"></textarea>
-        <label>Workspace ID</label>
-        <input type="text" name="workspace_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
-        <p class="hint">URL: .../groups/<strong>WORKSPACE-ID</strong>/reports/...</p>
-        <label>Report ID</label>
-        <input type="text" name="report_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
-        <p class="hint">URL: .../reports/<strong>REPORT-ID</strong>/...</p>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-outline" onclick="closeModal('modal-create')">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Salvar</button>
-        </div>
-      </form>
+<!-- Modal criar relatório -->
+<div class="pp-modal-overlay" id="modal-create">
+  <div class="pp-modal">
+    <div class="pp-modal-header">
+      <div class="pp-modal-title">Novo relatório</div>
+      <div class="pp-modal-sub">Cole os IDs encontrados na URL do relatório no Power BI.</div>
     </div>
-  </div>
-
-  <!-- Modal editar relatório -->
-  <div class="modal-overlay" id="modal-edit">
-    <div class="modal">
-      <h2>Editar relatório</h2>
-      <p class="modal-sub">Atualize as informações do relatório.</p>
-      <form method="POST" id="form-edit">
-        <label>Nome</label>
-        <input type="text" name="name" id="edit-name" required>
-        <label>Descrição</label>
-        <textarea name="description" id="edit-description"></textarea>
-        <label>Workspace ID</label>
-        <input type="text" name="workspace_id" id="edit-workspace" required>
-        <label>Report ID</label>
-        <input type="text" name="report_id" id="edit-report" required>
-        <div class="checkbox-row">
-          <input type="checkbox" name="has_rls" id="edit-has-rls">
-          <label for="edit-has-rls" style="margin:0;font-weight:400">Este relatório usa RLS</label>
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-outline" onclick="closeModal('modal-edit')">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Salvar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Modal regra RLS -->
-  <div class="modal-overlay" id="modal-rls-form">
-    <div class="modal">
-      <h2 id="rls-form-title">Nova regra RLS</h2>
-      <div class="rls-modal-header">
-        <p id="rls-form-report-name"></p>
-        <small>Cada regra define o filtro aplicado a uma role específica do sistema.</small>
+    <form method="POST" action="/admin/reports/create">
+      <label class="pp-label">Nome do relatório</label>
+      <input class="pp-input" type="text" name="name" placeholder="Ex: Vendas por Revenda" required autofocus>
+      <label class="pp-label">Descrição <span style="color:var(--pp-gray300);font-weight:400">(opcional)</span></label>
+      <textarea class="pp-textarea" name="description" placeholder="Breve descrição"></textarea>
+      <label class="pp-label">Workspace ID</label>
+      <input class="pp-input" type="text" name="workspace_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+      <p class="pp-hint">URL: .../groups/<strong>WORKSPACE-ID</strong>/reports/...</p>
+      <label class="pp-label">Report ID</label>
+      <input class="pp-input" type="text" name="report_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required>
+      <p class="pp-hint">URL: .../reports/<strong>REPORT-ID</strong>/...</p>
+      <div class="pp-modal-actions">
+        <button type="button" class="pp-btn pp-btn-outline" onclick="ppCloseModal('modal-create')">Cancelar</button>
+        <button type="submit" class="pp-btn pp-btn-primary">Salvar</button>
       </div>
-      <form method="POST" id="form-rls">
-        <input type="hidden" name="rls_id" id="rls-id">
-
-        <label>Nome da regra <span style="color:#aaa;font-weight:400">(identificação interna)</span></label>
-        <input type="text" name="rule_name" id="rls-rule-name"
-          placeholder="Ex: Filtro gerentes por revenda">
-
-        <label>Role do sistema que será filtrada</label>
-        <select name="system_role" id="rls-system-role">
-          <option value="gerente">Gerente</option>
-          <option value="user">Usuário comum</option>
-          <option value="diretor">Diretor</option>
-          <option value="admin">Administrador</option>
-        </select>
-        <p class="hint">Somente usuários desta role serão filtrados. As demais roles verão tudo.</p>
-
-        <label>Nome da role no Power BI</label>
-        <input type="text" name="role_name" id="rls-role-name"
-          placeholder="Ex: empresa_revenda" required>
-        <p class="hint">Nome exato da função em Modelagem → Gerenciar funções no Power BI Desktop.</p>
-
-        <label>Campo de filtro do usuário</label>
-        <select name="filter_source" id="rls-filter-source">
-          <option value="empresa_revenda">Revenda (empresa_revenda)</option>
-          <option value="departamento">Departamento (departamento)</option>
-          <option value="email">Email do usuário</option>
-        </select>
-        <p class="hint">Qual dado do perfil do usuário será enviado como identidade ao Power BI.</p>
-
-        <label>Descrição <span style="color:#aaa;font-weight:400">(opcional)</span></label>
-        <input type="text" name="description" id="rls-description"
-          placeholder="Ex: Gerentes só veem dados da própria revenda">
-
-        <div class="modal-actions">
-          <button type="button" class="btn btn-outline" onclick="closeModal('modal-rls-form')">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Salvar regra</button>
-        </div>
-      </form>
-    </div>
+    </form>
   </div>
+</div>
 
-  <script>
-    function openModal(id) {
-      document.getElementById(id).classList.add('active');
-    }
-    function closeModal(id) {
-      document.getElementById(id).classList.remove('active');
-    }
-    function toggleRLS(reportId) {
-      var panel = document.getElementById('rls-panel-' + reportId);
-      panel.classList.toggle('open');
-    }
-    function openEdit(id, name, description, reportId, workspaceId, hasRls) {
-      document.getElementById('form-edit').action       = '/admin/reports/edit/' + id;
-      document.getElementById('edit-name').value        = name;
-      document.getElementById('edit-description').value = description;
-      document.getElementById('edit-workspace').value   = workspaceId;
-      document.getElementById('edit-report').value      = reportId;
-      document.getElementById('edit-has-rls').checked   = hasRls;
-      openModal('modal-edit');
-    }
-    function openRLSForm(reportId, reportName, rlsId, ruleName, systemRole, roleName, filterSource, description) {
-      var isEdit = rlsId > 0;
-      document.getElementById('rls-form-title').textContent        = isEdit ? 'Editar regra RLS' : 'Nova regra RLS';
-      document.getElementById('rls-form-report-name').textContent   = reportName;
-      document.getElementById('form-rls').action                    = '/admin/reports/' + reportId + '/rls/save';
-      document.getElementById('rls-id').value                       = rlsId || '';
-      document.getElementById('rls-rule-name').value                = ruleName;
-      document.getElementById('rls-description').value              = description;
-      document.getElementById('rls-role-name').value                = roleName;
+<!-- Modal editar relatório -->
+<div class="pp-modal-overlay" id="modal-edit">
+  <div class="pp-modal">
+    <div class="pp-modal-header">
+      <div class="pp-modal-title">Editar relatório</div>
+    </div>
+    <form method="POST" id="form-edit">
+      <label class="pp-label">Nome</label>
+      <input class="pp-input" type="text" name="name" id="edit-name" required>
+      <label class="pp-label">Descrição</label>
+      <textarea class="pp-textarea" name="description" id="edit-description"></textarea>
+      <label class="pp-label">Workspace ID</label>
+      <input class="pp-input" type="text" name="workspace_id" id="edit-workspace" required>
+      <label class="pp-label">Report ID</label>
+      <input class="pp-input" type="text" name="report_id" id="edit-report" required>
+      <div class="pp-checkbox-row">
+        <input type="checkbox" name="has_rls" id="edit-has-rls">
+        <label for="edit-has-rls" style="margin:0;font-weight:400">Este relatório usa RLS</label>
+      </div>
+      <div class="pp-modal-actions">
+        <button type="button" class="pp-btn pp-btn-outline" onclick="ppCloseModal('modal-edit')">Cancelar</button>
+        <button type="submit" class="pp-btn pp-btn-primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-      // Seleciona system_role
-      var selSys = document.getElementById('rls-system-role');
-      for (var i = 0; i < selSys.options.length; i++) {
-        if (selSys.options[i].value === systemRole) { selSys.selectedIndex = i; break; }
-      }
+<!-- Modal regra RLS -->
+<div class="pp-modal-overlay" id="modal-rls-form">
+  <div class="pp-modal">
+    <div class="pp-modal-header">
+      <div class="pp-modal-title" id="rls-form-title">Nova regra RLS</div>
+    </div>
+    <div class="rls-modal-banner">
+      <p id="rls-form-report-name"></p>
+      <small>Cada regra define o filtro aplicado a uma role específica do sistema.</small>
+    </div>
+    <form method="POST" id="form-rls">
+      <input type="hidden" name="rls_id" id="rls-id">
+      <label class="pp-label">Nome da regra <span style="color:var(--pp-gray300);font-weight:400">(identificação interna)</span></label>
+      <input class="pp-input" type="text" name="rule_name" id="rls-rule-name" placeholder="Ex: Filtro gerentes por revenda">
+      <label class="pp-label">Role do sistema que será filtrada</label>
+      <select class="pp-select" name="system_role" id="rls-system-role">
+        <option value="gerente">Gerente</option>
+        <option value="user">Usuário comum</option>
+        <option value="diretor">Diretor</option>
+        <option value="admin">Administrador</option>
+      </select>
+      <p class="pp-hint">Somente usuários desta role serão filtrados. As demais roles verão tudo.</p>
+      <label class="pp-label">Nome da role no Power BI</label>
+      <input class="pp-input" type="text" name="role_name" id="rls-role-name" placeholder="Ex: empresa_revenda" required>
+      <p class="pp-hint">Nome exato da função em Modelagem → Gerenciar funções no Power BI Desktop.</p>
+      <label class="pp-label">Campo de filtro do usuário</label>
+      <select class="pp-select" name="filter_source" id="rls-filter-source">
+        <option value="empresa_revenda">Revenda (empresa_revenda)</option>
+        <option value="departamento">Departamento (departamento)</option>
+        <option value="email">Email do usuário</option>
+      </select>
+      <label class="pp-label">Descrição <span style="color:var(--pp-gray300);font-weight:400">(opcional)</span></label>
+      <input class="pp-input" type="text" name="description" id="rls-description" placeholder="Ex: Gerentes só veem dados da própria revenda">
+      <div class="pp-modal-actions">
+        <button type="button" class="pp-btn pp-btn-outline" onclick="ppCloseModal('modal-rls-form')">Cancelar</button>
+        <button type="submit" class="pp-btn pp-btn-primary">Salvar regra</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-      // Seleciona filter_source
-      var selFilter = document.getElementById('rls-filter-source');
-      for (var i = 0; i < selFilter.options.length; i++) {
-        if (selFilter.options[i].value === filterSource) { selFilter.selectedIndex = i; break; }
-      }
+{% block extra_script %}
+<script>
+  function toggleRLS(reportId) {
+    var panel = document.getElementById('rls-panel-' + reportId);
+    panel.classList.toggle('open');
+  }
 
-      openModal('modal-rls-form');
+  function openEdit(id, name, description, reportId, workspaceId, hasRls) {
+    document.getElementById('form-edit').action        = '/admin/reports/edit/' + id;
+    document.getElementById('edit-name').value         = name;
+    document.getElementById('edit-description').value  = description;
+    document.getElementById('edit-workspace').value    = workspaceId;
+    document.getElementById('edit-report').value       = reportId;
+    document.getElementById('edit-has-rls').checked    = hasRls;
+    ppOpenModal('modal-edit');
+  }
+
+  function openRLSForm(reportId, reportName, rlsId, ruleName, systemRole, roleName, filterSource, description) {
+    var isEdit = rlsId > 0;
+    document.getElementById('rls-form-title').textContent       = isEdit ? 'Editar regra RLS' : 'Nova regra RLS';
+    document.getElementById('rls-form-report-name').textContent  = reportName;
+    document.getElementById('form-rls').action                   = '/admin/reports/' + reportId + '/rls/save';
+    document.getElementById('rls-id').value                      = rlsId || '';
+    document.getElementById('rls-rule-name').value               = ruleName;
+    document.getElementById('rls-role-name').value               = roleName;
+    document.getElementById('rls-description').value             = description;
+    var selSys = document.getElementById('rls-system-role');
+    for (var i = 0; i < selSys.options.length; i++) {
+      if (selSys.options[i].value === systemRole) { selSys.selectedIndex = i; break; }
     }
-    document.querySelectorAll('.modal-overlay').forEach(function(o) {
-      o.addEventListener('click', function(e) {
-        if (e.target === o) o.classList.remove('active');
-      });
-    });
-  </script>
-</body>
-</html>
+    var selFilter = document.getElementById('rls-filter-source');
+    for (var i = 0; i < selFilter.options.length; i++) {
+      if (selFilter.options[i].value === filterSource) { selFilter.selectedIndex = i; break; }
+    }
+    ppOpenModal('modal-rls-form');
+  }
+</script>
+{% endblock %}
+{% endblock %}
