@@ -1,4 +1,4 @@
-{% if user.is_admin %}
+{% if user is defined and user.is_admin %}
   <a href="/admin/users"       class="pp-nav-link">Usuários</a>
   <a href="/admin/roles"       class="pp-nav-link">Perfis</a>
   <a href="/admin/groups"      class="pp-nav-link">Grupos</a>

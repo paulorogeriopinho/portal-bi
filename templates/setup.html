@@ -1,48 +1,36 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-  <meta charset="UTF-8">
-  <title>Configuração Inicial — Portal BI</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f0f2f5;
-      display: flex; align-items: center; justify-content: center; min-height: 100vh;
-    }
-    .card {
-      background: #fff; border-radius: 12px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-      padding: 48px 40px; width: 100%; max-width: 420px;
-    }
-    h1 { font-size: 20px; font-weight: 600; color: #1a1a2e; margin-bottom: 6px; }
-    p { font-size: 13px; color: #888; margin-bottom: 28px; }
-    label { display: block; font-size: 13px; font-weight: 500; color: #444; margin-bottom: 6px; }
-    input {
-      width: 100%; padding: 10px 14px; border: 1px solid #ddd;
-      border-radius: 8px; font-size: 14px; margin-bottom: 18px; outline: none;
-    }
-    input:focus { border-color: #4f46e5; }
-    button {
-      width: 100%; padding: 12px; background: #4f46e5; color: #fff;
-      border: none; border-radius: 8px; font-size: 15px; font-weight: 500; cursor: pointer;
-    }
-    button:hover { background: #4338ca; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>Configuração inicial</h1>
-    <p>Crie o primeiro usuário administrador do portal.</p>
-    <form method="POST" action="/setup">
-      <label>Nome</label>
-      <input type="text" name="name" placeholder="Seu nome" required autofocus>
-      <label>Email</label>
-      <input type="email" name="email" placeholder="admin@empresa.com" required>
-      <label>Senha</label>
-      <input type="password" name="password" placeholder="Mínimo 8 caracteres" required>
-      <button type="submit">Criar administrador</button>
-    </form>
+{% extends "base.html" %}
+{% block nav %}{% endblock %}
+{% block title %}Configuração inicial{% endblock %}
+
+{% block extra_style %}
+<style>
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .setup-card { background:#fff; border-radius:14px; padding:40px 36px; width:100%; max-width:420px; border:1px solid var(--pp-gray100); box-shadow:0 8px 40px rgba(13,27,42,0.1); }
+  .setup-logo { width:48px; height:48px; border-radius:11px; background:var(--pp-accent); display:flex; align-items:center; justify-content:center; margin-bottom:20px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="setup-card">
+  <div class="setup-logo">
+    <svg viewBox="0 0 18 18" fill="none" width="26" height="26">
+      <rect x="2"  y="9" width="3.5" height="7"  rx="1" fill="#0D1B2A"/>
+      <rect x="7"  y="6" width="3.5" height="10" rx="1" fill="#0D1B2A"/>
+      <rect x="12" y="2" width="3.5" height="14" rx="1" fill="#0D1B2A"/>
+    </svg>
   </div>
-</body>
-</html>
+  <div class="pp-page-title" style="margin-bottom:4px">Configuração inicial</div>
+  <div class="pp-page-sub" style="margin-bottom:28px">Crie o primeiro usuário administrador do portal.</div>
+  <form method="POST" action="/setup">
+    <label class="pp-label">Nome</label>
+    <input class="pp-input" type="text" name="name" placeholder="Seu nome completo" required autofocus>
+    <label class="pp-label">Email</label>
+    <input class="pp-input" type="email" name="email" placeholder="admin@empresa.com" required>
+    <label class="pp-label">Senha</label>
+    <input class="pp-input" type="password" name="password" placeholder="Mínimo 8 caracteres" required>
+    <button type="submit" class="pp-btn pp-btn-primary" style="width:100%;justify-content:center">
+      Criar administrador
+    </button>
+  </form>
+</div>
+{% endblock %}

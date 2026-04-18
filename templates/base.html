@@ -243,10 +243,12 @@
 {% block content %}{% endblock %}
 
 <!-- Footer -->
+{% block footer %}
 <footer class="pp-footer">
   Powered by <a href="#">Paulo Pinho BI</a>
   {% if portal.company_name %} · {{ portal.company_name }}{% endif %}
 </footer>
+{% endblock %}
 
 <script>
   function ppOpenModal(id)  { document.getElementById(id).classList.add('active'); }
