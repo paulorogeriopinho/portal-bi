@@ -222,13 +222,7 @@
         <input type="email" name="email" required>
         <label>Senha</label>
         <input type="password" name="password" required placeholder="Mínimo 8 caracteres">
-        <label class="pp-label">Cliente / Empresa</label>
-        <select class="pp-select" name="client_id">
-          <option value="">— sem cliente —</option>
-          {% for c in clients %}
-          <option value="{{ c.id }}">{{ c.company_name }}</option>
-          {% endfor %}
-        </select>
+        
         <label>Perfil</label>
         <select name="role">
           <option value="user">Usuário comum</option>
@@ -268,12 +262,7 @@
         <input type="email" name="email" id="edit-email" required>
         <label>Nova senha <span style="color:#aaa;font-weight:400">(deixe em branco para manter)</span></label>
         <input type="password" name="password" placeholder="Mínimo 8 caracteres">
-        <select class="pp-select" name="client_id">
-          <option value="">— sem cliente —</option>
-          {% for c in clients %}
-          <option value="{{ c.id }}">{{ c.company_name }}</option>
-          {% endfor %}
-        </select>
+        
         <label>Perfil</label>
         <select name="role" id="edit-role">
           <option value="user">Usuário comum</option>
