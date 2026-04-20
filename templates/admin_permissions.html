@@ -111,6 +111,7 @@
   var allReports      = [];
   var roleFilter      = '';
   var itemSearchQuery = '';
+  var allModules = [];
 
   function setRoleFilter(role, btn) {
     roleFilter = role;
@@ -141,13 +142,11 @@
     if (revenda) meta += '<span>Revenda: ' + revenda + '</span>';
     if (depto)   meta += '<span>Depto: ' + depto + '</span>';
     document.getElementById('right-panel').innerHTML =
-      '<div class="right-header">' +
-        '<div class="right-user-name">' + name + '</div>' +
-        '<div class="right-user-meta">' + meta + '</div>' +
-      '</div>' +
+      '<div class="right-header">...' +
       '<div class="pp-tabs">' +
         '<button class="pp-tab-btn active" id="tab-groups"  onclick="switchTab(\'groups\')">Grupos</button>' +
-        '<button class="pp-tab-btn"        id="tab-reports" onclick="switchTab(\'reports\')">Relatórios avulsos</button>' +
+        '<button class="pp-tab-btn"        id="tab-reports" onclick="switchTab(\'reports\')">Relatórios</button>' +
+        '<button class="pp-tab-btn"        id="tab-modules" onclick="switchTab(\'modules\')">Módulos</button>' +
       '</div>' +
       '<div class="list-search"><input id="item-search" placeholder="Buscar..." oninput="filterItems()"/></div>' +
       '<div class="item-list" id="item-list"><div class="loading">Carregando...</div></div>';
@@ -160,6 +159,7 @@
     if (el) el.value = '';
     document.getElementById('tab-groups').classList.toggle('active',  tab === 'groups');
     document.getElementById('tab-reports').classList.toggle('active', tab === 'reports');
+    document.getElementById('tab-modules').classList.toggle('active', tab === 'modules');
     renderItems();
   }
 
@@ -172,7 +172,9 @@
     fetch('/admin/permissions/user/' + userId)
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        allGroups = data.groups; allReports = data.reports;
+        allGroups  = data.groups;
+        allReports = data.reports;
+        allModules = data.modules;
         var badge = document.getElementById('badge-' + userId);
         if (badge) {
           badge.textContent = data.user.ind_count || '0';
@@ -183,6 +185,10 @@
   }
 
   function renderItems() {
+    if (currentTab === 'modules') {
+      renderUserModules();
+      return;
+    }
     var list = currentTab === 'groups' ? allGroups : allReports;
     var icon = currentTab === 'groups' ? '📁' : '📊';
     var html = '';
@@ -202,6 +208,43 @@
     });
     if (!html) html = '<div class="empty-state" style="padding:40px"><div>🔍</div><div>Nenhum item encontrado.</div></div>';
     document.getElementById('item-list').innerHTML = html;
+  }
+
+  function renderUserModules() {
+    var html = '';
+    allModules.forEach(function(m) {
+      var sourceHtml = '', rightHtml = '';
+      if (m.source === 'role') {
+        sourceHtml = '<div class="perm-source role">via perfil — herdado</div>';
+        rightHtml  = '<span class="role-pill">perfil</span>';
+      } else {
+        var isOn   = m.source === 'individual';
+        sourceHtml = '<div class="perm-source ' + (isOn ? 'individual' : 'none') + '">' + (isOn ? 'acesso individual ativo' : 'sem acesso') + '</div>';
+        rightHtml  = '<button class="pp-toggle ' + (isOn ? 'on' : 'off') + '" onclick="toggleUserModule(this,\'' + m.key + '\')"></button>';
+      }
+      html += '<div class="perm-item"><div class="perm-icon">' + m.icon + '</div><div class="perm-info"><div class="perm-name">' + m.label + '</div>' + sourceHtml + '</div>' + rightHtml + '</div>';
+    });
+    if (!html) html = '<div class="empty-state" style="padding:40px"><div>Nenhum módulo.</div></div>';
+    document.getElementById('item-list').innerHTML = html;
+  }
+
+  async function toggleUserModule(btn, moduleKey) {
+    var res  = await fetch('/admin/permissions/toggle-module', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: currentUserId, module: moduleKey })
+    });
+    var data = await res.json();
+    var nowOn = data.status === 'added';
+    btn.classList.toggle('on', nowOn);
+    btn.classList.toggle('off', !nowOn);
+    var sourceEl = btn.closest('.perm-item').querySelector('.perm-source');
+    if (sourceEl) {
+      sourceEl.textContent = nowOn ? 'acesso individual ativo' : 'sem acesso';
+      sourceEl.className   = 'perm-source ' + (nowOn ? 'individual' : 'none');
+    }
+    allModules.forEach(function(m) { if (m.key === moduleKey) m.source = nowOn ? 'individual' : null; });
+    loadBadge(currentUserId);
   }
 
   async function togglePerm(btn, userId, type, itemId) {

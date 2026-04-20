@@ -92,9 +92,26 @@ def init_models(db):
         value      = db.Column(db.Text)
         updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    class RoleModulePermission(db.Model):
+        __tablename__ = "role_module_permissions"
+        id         = db.Column(db.Integer, primary_key=True)
+        role       = db.Column(db.String(50), nullable=False)
+        module     = db.Column(db.String(50), nullable=False)
+        created_at = db.Column(db.DateTime, default=datetime.utcnow)
+        __table_args__ = (db.UniqueConstraint("role", "module"),)
+
+    class UserModulePermission(db.Model):
+        __tablename__ = "user_module_permissions"
+        id         = db.Column(db.Integer, primary_key=True)
+        user_id    = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+        module     = db.Column(db.String(50), nullable=False)
+        created_at = db.Column(db.DateTime, default=datetime.utcnow)
+        __table_args__ = (db.UniqueConstraint("user_id", "module"),)
+
     return (User, Report, ReportRLS, Group, ReportGroup,
             Permission, RolePermission, AccessLog,
-            PasswordResetCode, PortalSettings)
+            PasswordResetCode, PortalSettings,
+            RoleModulePermission, UserModulePermission)
 
 def create_tables(db):
     db.create_all()

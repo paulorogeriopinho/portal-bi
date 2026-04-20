@@ -14,10 +14,41 @@ import string
 def init_routes(app, db, mail,
                 User, Report, ReportRLS, Group, ReportGroup,
                 Permission, RolePermission, AccessLog,
-                PasswordResetCode, PortalSettings):
+                PasswordResetCode, PortalSettings,
+                RoleModulePermission, UserModulePermission):
     
     # ── Helpers ──────────────────────────────────────────────────
 
+    def get_user_modules(user):
+        """Retorna set de módulos que o usuário pode acessar."""
+        if user.is_admin:
+            return {m["key"] for m in app.config["SYSTEM_MODULES"]}
+        # Via role
+        role_mods = {rm.module for rm in
+                     RoleModulePermission.query.filter_by(role=user.role).all()}
+        # Via permissão individual
+        user_mods = {um.module for um in
+                     UserModulePermission.query.filter_by(user_id=user.id).all()}
+        return role_mods | user_mods
+
+    def require_module(module_key):
+        """Decorator que verifica acesso ao módulo."""
+        from functools import wraps
+        def decorator(f):
+            @wraps(f)
+            def decorated(*args, **kwargs):
+                from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+                verify_jwt_in_request()
+                uid  = int(get_jwt_identity())
+                user = User.query.get(uid)
+                if not user or not user.active:
+                    return redirect(url_for("login"))
+                if user.is_admin or module_key in get_user_modules(user):
+                    return f(*args, **kwargs)
+                return redirect(url_for("dashboard"))
+            return decorated
+        return decorator
+    
     def get_user_reports(user):
         """Retorna (groups_data, loose_reports) considerando role + permissões extras."""
         if user.is_admin:
@@ -188,7 +219,7 @@ def init_routes(app, db, mail,
     def admin_users():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
-        if not user.is_admin:
+        if not user.is_admin and "users" not in get_user_modules(user):
             return redirect(url_for("dashboard"))
 
         # Filtros
@@ -285,7 +316,7 @@ def init_routes(app, db, mail,
     def admin_reports():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
-        if not user.is_admin:
+        if not user.is_admin and "reports" not in get_user_modules(user):
             return redirect(url_for("dashboard"))
         reports = Report.query.order_by(Report.created_at.desc()).all()
         for r in reports:
@@ -408,7 +439,7 @@ def init_routes(app, db, mail,
     def admin_groups():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
-        if not user.is_admin:
+        if not user.is_admin and "groups" not in get_user_modules(user):
             return redirect(url_for("dashboard"))
         groups  = Group.query.order_by(Group.created_at.desc()).all()
         reports = Report.query.filter_by(active=True).order_by(Report.name).all()
@@ -487,7 +518,7 @@ def init_routes(app, db, mail,
     def admin_permissions():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
-        if not user.is_admin:
+        if not user.is_admin and "permissions" not in get_user_modules(user):
             return redirect(url_for("dashboard"))
         users = User.query.filter_by(is_admin=False, active=True).order_by(User.name).all()
         return render_template("admin_permissions.html", user=user, users=users)
@@ -529,7 +560,7 @@ def init_routes(app, db, mail,
     def admin_roles():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
-        if not user.is_admin:
+        if not user.is_admin and "roles" not in get_user_modules(user):
             return redirect(url_for("dashboard"))
         return render_template("admin_roles.html", user=user)
 
@@ -570,7 +601,7 @@ def init_routes(app, db, mail,
     def admin_logs():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
-        if not user.is_admin:
+        if not user.is_admin and "logs" not in get_user_modules(user):
             return redirect(url_for("dashboard"))
         logs = db.session.query(AccessLog, User, Report)\
             .join(User,   AccessLog.user_id   == User.id)\
@@ -655,68 +686,17 @@ def init_routes(app, db, mail,
         db.session.commit()
         return render_template("reset_password.html", success=True)
     
-    # ── API JSON para permissões dinâmicas ───────────────────────
+    # ── API Módulos ───────────────────────────────────────────────
 
-    @app.route("/admin/permissions/user/<int:target_id>")
-    @jwt_required()
-    def get_user_permissions(target_id):
-        user_id = int(get_jwt_identity())
-        admin   = User.query.get(user_id)
-        if not admin.is_admin:
-            return jsonify({"error": "Sem permissão"}), 403
-
-        target = User.query.get_or_404(target_id)
-
-        # Permissões individuais
-        ind_group_ids  = {p.group_id  for p in Permission.query.filter_by(user_id=target_id, report_id=None).all() if p.group_id}
-        ind_report_ids = {p.report_id for p in Permission.query.filter_by(user_id=target_id, group_id=None).all() if p.report_id}
-
-        # Permissões herdadas da role
-        role_group_ids  = {rp.group_id  for rp in RolePermission.query.filter_by(role=target.role, report_id=None).all() if rp.group_id}
-        role_report_ids = {rp.report_id for rp in RolePermission.query.filter_by(role=target.role, group_id=None).all() if rp.report_id}
-
-        # Todos os grupos ativos
-        groups = Group.query.filter_by(active=True).order_by(Group.name).all()
-        groups_data = []
-        for g in groups:
-            source = None
-            if g.id in role_group_ids:
-                source = "role"
-            elif g.id in ind_group_ids:
-                source = "individual"
-            groups_data.append({
-                "id":     g.id,
-                "name":   g.name,
-                "source": source
-            })
-
-        # Todos os relatórios ativos
-        reports = Report.query.filter_by(active=True).order_by(Report.name).all()
-        reports_data = []
-        for r in reports:
-            source = None
-            if r.id in role_report_ids:
-                source = "role"
-            elif r.id in ind_report_ids:
-                source = "individual"
-            reports_data.append({
-                "id":     r.id,
-                "name":   r.name,
-                "source": source
-            })
-
-        return jsonify({
-            "user": {
-                "id":               target.id,
-                "name":             target.name,
-                "role":             target.role,
-                "empresa_revenda":  target.empresa_revenda or "—",
-                "departamento":     target.departamento or "—",
-                "ind_count":        len(ind_group_ids) + len(ind_report_ids)
-            },
-            "groups":  groups_data,
-            "reports": reports_data
-        })
+    MODULES_LIST = [
+        {"key": "logs",        "label": "Logs de acesso",  "icon": "📋"},
+        {"key": "users",       "label": "Usuários",         "icon": "👥"},
+        {"key": "groups",      "label": "Grupos",           "icon": "📁"},
+        {"key": "reports",     "label": "Relatórios",       "icon": "📊"},
+        {"key": "permissions", "label": "Permissões",       "icon": "🔑"},
+        {"key": "roles",       "label": "Perfis RBAC",      "icon": "🎭"},
+        {"key": "settings",    "label": "Configurações",    "icon": "⚙️"},
+    ]
 
     @app.route("/admin/permissions/role/<string:role>")
     @jwt_required()
@@ -728,12 +708,10 @@ def init_routes(app, db, mail,
 
         role_group_ids  = {rp.group_id  for rp in RolePermission.query.filter_by(role=role, report_id=None).all() if rp.group_id}
         role_report_ids = {rp.report_id for rp in RolePermission.query.filter_by(role=role, group_id=None).all() if rp.report_id}
+        role_mod_keys   = {rm.module    for rm in RoleModulePermission.query.filter_by(role=role).all()}
 
-        groups = Group.query.filter_by(active=True).order_by(Group.name).all()
-        groups_data = [{"id": g.id, "name": g.name, "active": g.id in role_group_ids} for g in groups]
-
+        groups  = Group.query.filter_by(active=True).order_by(Group.name).all()
         reports = Report.query.filter_by(active=True).order_by(Report.name).all()
-        reports_data = [{"id": r.id, "name": r.name, "active": r.id in role_report_ids} for r in reports]
 
         role_labels = {"user": "Usuário comum", "gerente": "Gerente", "diretor": "Diretor"}
         user_count  = User.query.filter_by(role=role, active=True).count()
@@ -742,9 +720,98 @@ def init_routes(app, db, mail,
             "role":       role,
             "label":      role_labels.get(role, role),
             "user_count": user_count,
-            "groups":     groups_data,
-            "reports":    reports_data
+            "groups":     [{"id": g.id, "name": g.name, "active": g.id in role_group_ids} for g in groups],
+            "reports":    [{"id": r.id, "name": r.name, "active": r.id in role_report_ids} for r in reports],
+            "modules":    [{"key": m["key"], "label": m["label"], "icon": m["icon"], "active": m["key"] in role_mod_keys} for m in MODULES_LIST],
         })
+
+    @app.route("/admin/roles/toggle-module", methods=["POST"])
+    @jwt_required()
+    def toggle_role_module():
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        data   = request.json
+        role   = data["role"]
+        module = data["module"]
+        perm   = RoleModulePermission.query.filter_by(role=role, module=module).first()
+        if perm:
+            db.session.delete(perm)
+            db.session.commit()
+            return jsonify({"status": "removed"})
+        db.session.add(RoleModulePermission(role=role, module=module))
+        db.session.commit()
+        return jsonify({"status": "added"})
+
+    @app.route("/admin/permissions/user/<int:target_id>")
+    @jwt_required()
+    def get_user_permissions(target_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+
+        target = User.query.get_or_404(target_id)
+
+        ind_group_ids  = {p.group_id  for p in Permission.query.filter_by(user_id=target_id, report_id=None).all() if p.group_id}
+        ind_report_ids = {p.report_id for p in Permission.query.filter_by(user_id=target_id, group_id=None).all() if p.report_id}
+        ind_mod_keys   = {um.module   for um in UserModulePermission.query.filter_by(user_id=target_id).all()}
+
+        role_group_ids  = {rp.group_id  for rp in RolePermission.query.filter_by(role=target.role, report_id=None).all() if rp.group_id}
+        role_report_ids = {rp.report_id for rp in RolePermission.query.filter_by(role=target.role, group_id=None).all() if rp.report_id}
+        role_mod_keys   = {rm.module    for rm in RoleModulePermission.query.filter_by(role=target.role).all()}
+
+        groups  = Group.query.filter_by(active=True).order_by(Group.name).all()
+        reports = Report.query.filter_by(active=True).order_by(Report.name).all()
+
+        groups_data = []
+        for g in groups:
+            source = "role" if g.id in role_group_ids else ("individual" if g.id in ind_group_ids else None)
+            groups_data.append({"id": g.id, "name": g.name, "source": source})
+
+        reports_data = []
+        for r in reports:
+            source = "role" if r.id in role_report_ids else ("individual" if r.id in ind_report_ids else None)
+            reports_data.append({"id": r.id, "name": r.name, "source": source})
+
+        modules_data = []
+        for m in MODULES_LIST:
+            source = "role" if m["key"] in role_mod_keys else ("individual" if m["key"] in ind_mod_keys else None)
+            modules_data.append({"key": m["key"], "label": m["label"], "icon": m["icon"], "source": source})
+
+        return jsonify({
+            "user": {
+                "id":              target.id,
+                "name":            target.name,
+                "role":            target.role,
+                "empresa_revenda": target.empresa_revenda or "—",
+                "departamento":    target.departamento or "—",
+                "ind_count":       len(ind_group_ids) + len(ind_report_ids) + len(ind_mod_keys)
+            },
+            "groups":  groups_data,
+            "reports": reports_data,
+            "modules": modules_data,
+        })
+
+    @app.route("/admin/permissions/toggle-module", methods=["POST"])
+    @jwt_required()
+    def toggle_user_module():
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not admin.is_admin:
+            return jsonify({"error": "Sem permissão"}), 403
+        data      = request.json
+        target_id = data["user_id"]
+        module    = data["module"]
+        perm      = UserModulePermission.query.filter_by(user_id=target_id, module=module).first()
+        if perm:
+            db.session.delete(perm)
+            db.session.commit()
+            return jsonify({"status": "removed"})
+        db.session.add(UserModulePermission(user_id=target_id, module=module))
+        db.session.commit()
+        return jsonify({"status": "added"})
     
     # ── Configurações do Portal ───────────────────────────────────
 
@@ -753,7 +820,7 @@ def init_routes(app, db, mail,
     def admin_settings():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
-        if not user.is_admin:
+        if not user.is_admin and "settings" not in get_user_modules(user):
             return redirect(url_for("dashboard"))
 
         if request.method == "POST":

@@ -109,6 +109,7 @@
   var allGroups   = [];
   var allReports  = [];
   var searchQuery = '';
+  var allModules  = [];
 
   ['user','gerente','diretor'].forEach(function(role) {
     fetch('/admin/permissions/role/' + role)
@@ -131,7 +132,8 @@
       '</div>' +
       '<div class="pp-tabs">' +
         '<button class="pp-tab-btn active" id="rtab-groups"  onclick="switchTab(\'groups\')">Grupos</button>' +
-        '<button class="pp-tab-btn"        id="rtab-reports" onclick="switchTab(\'reports\')">Relatórios avulsos</button>' +
+        '<button class="pp-tab-btn"        id="rtab-reports" onclick="switchTab(\'reports\')">Relatórios</button>' +
+        '<button class="pp-tab-btn"        id="rtab-modules" onclick="switchTab(\'modules\')">Módulos do sistema</button>' +
       '</div>' +
       '<div class="list-search"><input id="role-item-search" placeholder="Buscar..." oninput="filterRoleItems()"/></div>' +
       '<div class="item-list" id="role-item-list"><div class="loading">Carregando...</div></div>';
@@ -144,6 +146,7 @@
     if (el) el.value = '';
     document.getElementById('rtab-groups').classList.toggle('active',  tab === 'groups');
     document.getElementById('rtab-reports').classList.toggle('active', tab === 'reports');
+    document.getElementById('rtab-modules').classList.toggle('active', tab === 'modules');
     renderRoleItems();
   }
 
@@ -156,12 +159,18 @@
     fetch('/admin/permissions/role/' + role)
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        allGroups = data.groups; allReports = data.reports;
+        allGroups  = data.groups;
+        allReports = data.reports;
+        allModules = data.modules;
         renderRoleItems();
       });
   }
 
   function renderRoleItems() {
+    if (currentTab === 'modules') {
+      renderModules('role');
+      return;
+    }
     var list = currentTab === 'groups' ? allGroups : allReports;
     var icon = currentTab === 'groups' ? '📁' : '📊';
     var type = currentTab === 'groups' ? 'group' : 'report';
@@ -180,6 +189,34 @@
     document.getElementById('role-item-list').innerHTML = html;
   }
 
+  function renderModules(context) {
+    var html = '';
+    allModules.forEach(function(m) {
+      html +=
+        '<div class="perm-item">' +
+          '<div class="perm-icon">' + m.icon + '</div>' +
+          '<div class="perm-name">' + m.label + '</div>' +
+          '<button class="pp-toggle ' + (m.active ? 'on' : 'off') + '" ' +
+          'onclick="toggleModule(this,\'' + m.key + '\')"></button>' +
+        '</div>';
+    });
+    if (!html) html = '<div class="empty-state" style="padding:40px"><div>Nenhum módulo.</div></div>';
+    document.getElementById('role-item-list').innerHTML = html;
+  }
+
+  async function toggleModule(btn, moduleKey) {
+    var res  = await fetch('/admin/roles/toggle-module', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: currentRole, module: moduleKey })
+    });
+    var data = await res.json();
+    var nowOn = data.status === 'added';
+    btn.classList.toggle('on', nowOn);
+    btn.classList.toggle('off', !nowOn);
+    allModules.forEach(function(m) { if (m.key === moduleKey) m.active = nowOn; });
+  }
+
   async function toggleRolePerm(btn, role, type, itemId) {
     var body = { role: role };
     if (type === 'group')  body.group_id  = itemId;
@@ -191,6 +228,7 @@
     var arr = type === 'group' ? allGroups : allReports;
     arr.forEach(function(item) { if (item.id === itemId) item.active = nowOn; });
   }
+  
 </script>
 {% endblock %}
 {% endblock %}

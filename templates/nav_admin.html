@@ -1,42 +1,59 @@
 {% set path = request.path %}
-{% if user is defined and user.is_admin %}
+{% if user is defined %}
+
   <a href="/dashboard"
      class="pp-nav-link {% if path == '/dashboard' %}active{% endif %}">
     Dashboard
   </a>
+
+  {% if user.is_admin or 'groups' in user_modules %}
   <a href="/admin/groups"
      class="pp-nav-link {% if path.startswith('/admin/groups') %}active{% endif %}">
     Grupos
   </a>
+  {% endif %}
+
+  {% if user.is_admin or 'reports' in user_modules %}
   <a href="/admin/reports"
      class="pp-nav-link {% if path.startswith('/admin/reports') %}active{% endif %}">
     Relatórios
   </a>
+  {% endif %}
+
+  {% if user.is_admin or 'users' in user_modules %}
   <a href="/admin/users"
      class="pp-nav-link {% if path.startswith('/admin/users') %}active{% endif %}">
     Usuários
   </a>
+  {% endif %}
+
+  {% if user.is_admin or 'roles' in user_modules %}
   <a href="/admin/roles"
      class="pp-nav-link {% if path.startswith('/admin/roles') %}active{% endif %}">
     Perfis
   </a>
-  
+  {% endif %}
+
+  {% if user.is_admin or 'permissions' in user_modules %}
   <a href="/admin/permissions"
      class="pp-nav-link {% if path.startswith('/admin/permissions') %}active{% endif %}">
     Permissões
   </a>
+  {% endif %}
+
+  {% if user.is_admin or 'logs' in user_modules %}
   <a href="/admin/logs"
      class="pp-nav-link {% if path.startswith('/admin/logs') %}active{% endif %}">
     Logs
   </a>
+  {% endif %}
+
+  {% if user.is_admin or 'settings' in user_modules %}
   <a href="/admin/settings"
      class="pp-nav-link {% if path.startswith('/admin/settings') %}active{% endif %}">
     Configurações
   </a>
-{% else %}
-  <a href="/dashboard"
-     class="pp-nav-link {% if path == '/dashboard' %}active{% endif %}">
-    Dashboard
-  </a>
+  {% endif %}
+
 {% endif %}
 <a href="/logout" class="pp-nav-link">Sair</a>

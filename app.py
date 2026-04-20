@@ -40,7 +40,8 @@ def unauthorized_callback(error):
 from models import init_models, create_tables
 (User, Report, ReportRLS, Group, ReportGroup,
  Permission, RolePermission, AccessLog,
- PasswordResetCode, PortalSettings) = init_models(db)
+ PasswordResetCode, PortalSettings,
+ RoleModulePermission, UserModulePermission) = init_models(db)
 
 def get_portal_settings():
     """Retorna dict com todas as configurações do portal."""
@@ -49,23 +50,53 @@ def get_portal_settings():
 
 @app.context_processor
 def inject_settings():
-    """Injeta as configurações em todos os templates."""
     try:
         settings = get_portal_settings()
-        return {"portal": settings}
+        # Tenta pegar usuário logado para módulos disponíveis
+        from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+        try:
+            verify_jwt_in_request(optional=True)
+            uid = get_jwt_identity()
+            if uid:
+                u = User.query.get(int(uid))
+                if u:
+                    role_mods = {rm.module for rm in
+                                 RoleModulePermission.query.filter_by(role=u.role).all()}
+                    user_mods = {um.module for um in
+                                 UserModulePermission.query.filter_by(user_id=u.id).all()}
+                    available = role_mods | user_mods
+                    if u.is_admin:
+                        available = {m["key"] for m in SYSTEM_MODULES}
+                    return {"portal": settings, "user_modules": available}
+        except Exception:
+            pass
+        return {"portal": settings, "user_modules": set()}
     except Exception:
-        return {"portal": {
-            "company_name": "Portal BI",
-            "company_logo": "",
-            "accent_color": "#00A8CC",
-            "portal_name":  "Portal BI"
-        }}
+        return {"portal": {}, "user_modules": set()}
+
+# Lista de todos os módulos disponíveis
+SYSTEM_MODULES = [
+    {"key": "logs",        "label": "Logs de acesso",    "icon": "📋", "url": "/admin/logs"},
+    {"key": "users",       "label": "Usuários",           "icon": "👥", "url": "/admin/users"},
+    {"key": "groups",      "label": "Grupos",             "icon": "📁", "url": "/admin/groups"},
+    {"key": "reports",     "label": "Relatórios",         "icon": "📊", "url": "/admin/reports"},
+    {"key": "permissions", "label": "Permissões",         "icon": "🔑", "url": "/admin/permissions"},
+    {"key": "roles",       "label": "Perfis RBAC",        "icon": "🎭", "url": "/admin/roles"},
+    {"key": "settings",    "label": "Configurações",      "icon": "⚙️",  "url": "/admin/settings"},
+]
+
+app.config["SYSTEM_MODULES"] = SYSTEM_MODULES
+
+@app.context_processor
+def inject_modules():
+    return {"SYSTEM_MODULES": SYSTEM_MODULES}
 
 from routes import init_routes
 init_routes(app, db, mail,
             User, Report, ReportRLS, Group, ReportGroup,
             Permission, RolePermission, AccessLog,
-            PasswordResetCode, PortalSettings)
+            PasswordResetCode, PortalSettings,
+            RoleModulePermission, UserModulePermission)
 
 if __name__ == "__main__":
     with app.app_context():
