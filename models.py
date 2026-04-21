@@ -108,10 +108,19 @@ def init_models(db):
         created_at = db.Column(db.DateTime, default=datetime.utcnow)
         __table_args__ = (db.UniqueConstraint("user_id", "module"),)
 
+    class Role(db.Model):
+        __tablename__ = "roles"
+        id          = db.Column(db.Integer, primary_key=True)
+        key         = db.Column(db.String(50), unique=True, nullable=False)
+        label       = db.Column(db.String(100), nullable=False)
+        description = db.Column(db.String(300))
+        active      = db.Column(db.Boolean, default=True)
+        created_at  = db.Column(db.DateTime, default=datetime.utcnow)
+
     return (User, Report, ReportRLS, Group, ReportGroup,
             Permission, RolePermission, AccessLog,
             PasswordResetCode, PortalSettings,
-            RoleModulePermission, UserModulePermission)
+            RoleModulePermission, UserModulePermission, Role)
 
 def create_tables(db):
     db.create_all()

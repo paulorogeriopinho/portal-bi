@@ -41,7 +41,14 @@ from models import init_models, create_tables
 (User, Report, ReportRLS, Group, ReportGroup,
  Permission, RolePermission, AccessLog,
  PasswordResetCode, PortalSettings,
- RoleModulePermission, UserModulePermission) = init_models(db)
+ RoleModulePermission, UserModulePermission, Role) = init_models(db)
+
+@app.template_filter('user_count')
+def user_count_filter(role_key):
+    try:
+        return User.query.filter_by(role=role_key).count()
+    except Exception:
+        return 0
 
 def get_portal_settings():
     """Retorna dict com todas as configurações do portal."""
@@ -52,7 +59,6 @@ def get_portal_settings():
 def inject_settings():
     try:
         settings = get_portal_settings()
-        # Tenta pegar usuário logado para módulos disponíveis
         from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
         try:
             verify_jwt_in_request(optional=True)
@@ -60,20 +66,21 @@ def inject_settings():
             if uid:
                 u = User.query.get(int(uid))
                 if u:
-                    role_mods = {rm.module for rm in
-                                 RoleModulePermission.query.filter_by(role=u.role).all()}
-                    user_mods = {um.module for um in
-                                 UserModulePermission.query.filter_by(user_id=u.id).all()}
+                    role_mods = {rm.module for rm in RoleModulePermission.query.filter_by(role=u.role).all()}
+                    user_mods = {um.module for um in UserModulePermission.query.filter_by(user_id=u.id).all()}
                     available = role_mods | user_mods
                     if u.is_admin:
                         available = {m["key"] for m in SYSTEM_MODULES}
-                    return {"portal": settings, "user_modules": available}
+                    # Roles ativas para selects
+                    active_roles = Role.query.filter_by(active=True).order_by(Role.label).all()
+                    return {"portal": settings, "user_modules": available, "active_roles": active_roles}
         except Exception:
             pass
-        return {"portal": settings, "user_modules": set()}
+        active_roles = Role.query.filter_by(active=True).order_by(Role.label).all()
+        return {"portal": settings, "user_modules": set(), "active_roles": active_roles}
     except Exception:
-        return {"portal": {}, "user_modules": set()}
-
+        return {"portal": {}, "user_modules": set(), "active_roles": []}
+    
 # Lista de todos os módulos disponíveis
 SYSTEM_MODULES = [
     {"key": "logs",        "label": "Logs de acesso",    "icon": "📋", "url": "/admin/logs"},
@@ -96,7 +103,7 @@ init_routes(app, db, mail,
             User, Report, ReportRLS, Group, ReportGroup,
             Permission, RolePermission, AccessLog,
             PasswordResetCode, PortalSettings,
-            RoleModulePermission, UserModulePermission)
+            RoleModulePermission, UserModulePermission, Role)
 
 if __name__ == "__main__":
     with app.app_context():

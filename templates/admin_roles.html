@@ -69,28 +69,16 @@
 
   <div class="pp-split pp-card" style="min-height:520px">
     <div class="pp-split-left">
-      <div class="panel-title">Perfis do sistema</div>
-      <div class="role-item" onclick="selectRole('user', this)">
-        <div class="role-icon user">👤</div>
+      <div class="panel-title">Perfis cadastrados</div>
+      {% for r in active_roles %}
+      <div class="role-item" onclick="selectRole('{{ r.key }}', this)">
+        <div class="role-icon" style="background:var(--pp-ice);font-size:16px">🎭</div>
         <div>
-          <div class="role-meta-name">Usuário comum</div>
-          <div class="role-meta-count" id="count-user">carregando...</div>
+          <div class="role-meta-name">{{ r.label }}</div>
+          <div class="role-meta-count" id="count-{{ r.key }}">carregando...</div>
         </div>
       </div>
-      <div class="role-item" onclick="selectRole('gerente', this)">
-        <div class="role-icon gerente">🏪</div>
-        <div>
-          <div class="role-meta-name">Gerente</div>
-          <div class="role-meta-count" id="count-gerente">carregando...</div>
-        </div>
-      </div>
-      <div class="role-item" onclick="selectRole('diretor', this)">
-        <div class="role-icon diretor">👔</div>
-        <div>
-          <div class="role-meta-name">Diretor</div>
-          <div class="role-meta-count" id="count-diretor">carregando...</div>
-        </div>
-      </div>
+      {% endfor %}
     </div>
 
     <div class="pp-split-right" id="right-panel">
@@ -111,14 +99,15 @@
   var searchQuery = '';
   var allModules  = [];
 
-  ['user','gerente','diretor'].forEach(function(role) {
-    fetch('/admin/permissions/role/' + role)
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        var el = document.getElementById('count-' + role);
-        if (el) el.textContent = data.user_count + ' usuário(s)';
-      });
-  });
+  // Carrega contagens dinamicamente
+  {% for r in active_roles %}
+  fetch('/admin/permissions/role/{{ r.key }}')
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      var el = document.getElementById('count-{{ r.key }}');
+      if (el) el.textContent = data.user_count + ' usuário(s)';
+    });
+  {% endfor %}
 
   function selectRole(role, el) {
     currentRole = role; currentTab = 'groups'; searchQuery = '';

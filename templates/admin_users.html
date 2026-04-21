@@ -44,9 +44,9 @@
         <label>Perfil</label>
         <select name="role">
           <option value="">Todos</option>
-          <option value="user"    {% if f_role=='user'    %}selected{% endif %}>Usuário</option>
-          <option value="gerente" {% if f_role=='gerente' %}selected{% endif %}>Gerente</option>
-          <option value="diretor" {% if f_role=='diretor' %}selected{% endif %}>Diretor</option>
+          {% for r in active_roles %}
+          <option value="{{ r.key }}">{{ r.label }}</option>
+          {% endfor %}
         </select>
       </div>
       <div class="filter-group">
@@ -150,9 +150,9 @@
       <input class="pp-input" type="password" name="password" required placeholder="Mínimo 8 caracteres">
       <label class="pp-label">Perfil</label>
       <select class="pp-select" name="role">
-        <option value="user">Usuário comum</option>
-        <option value="gerente">Gerente</option>
-        <option value="diretor">Diretor</option>
+        {% for r in active_roles %}
+        <option value="{{ r.key }}">{{ r.label }}</option>
+        {% endfor %}
       </select>
       <div class="pp-form-row">
         <div>
@@ -191,9 +191,9 @@
       <input class="pp-input" type="password" name="password" placeholder="Mínimo 8 caracteres">
       <label class="pp-label">Perfil</label>
       <select class="pp-select" name="role" id="edit-role">
-        <option value="user">Usuário comum</option>
-        <option value="gerente">Gerente</option>
-        <option value="diretor">Diretor</option>
+        {% for r in active_roles %}
+        <option value="{{ r.key }}">{{ r.label }}</option>
+        {% endfor %}
       </select>
       <div class="pp-form-row">
         <div>

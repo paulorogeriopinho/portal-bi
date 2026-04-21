@@ -15,7 +15,7 @@ def init_routes(app, db, mail,
                 User, Report, ReportRLS, Group, ReportGroup,
                 Permission, RolePermission, AccessLog,
                 PasswordResetCode, PortalSettings,
-                RoleModulePermission, UserModulePermission):
+                RoleModulePermission, UserModulePermission, Role):
     
     # ── Helpers ──────────────────────────────────────────────────
 
@@ -142,8 +142,8 @@ def init_routes(app, db, mail,
         """Retorna True se o usuário tem acesso ao módulo."""
         if user.is_admin:
             return True
-        # settings e roles são exclusivos do admin
-        if module_key in ("settings", "roles"):
+        # settings é exclusivo do admin
+        if module_key == "settings":
             return False
         return module_key in get_user_modules(user)
 
@@ -277,7 +277,7 @@ def init_routes(app, db, mail,
             role            = data.get("role", "user"),
             empresa_revenda = data.get("empresa_revenda") or None,
             departamento    = data.get("departamento") or None,
-            client_id       = int(data["client_id"]) if data.get("client_id") else None,
+            #client_id       = int(data["client_id"]) if data.get("client_id") else None,   -> Campo não está sendo utilizado, pode ser removido no futuro
             active          = True
         )
         db.session.add(new_user)
@@ -300,7 +300,7 @@ def init_routes(app, db, mail,
         u.departamento    = data.get("departamento") or None
         u.is_admin        = data.get("is_admin") == "on"
         u.active          = data.get("active") == "on"
-        u.client_id = int(data["client_id"]) if data.get("client_id") else None
+        #u.client_id       = int(data["client_id"]) if data.get("client_id") else None   -> Campo não está sendo utilizado, pode ser removido no futuro
         if data.get("password"):
             u.password_hash = hash_password(data["password"])
         db.session.commit()
@@ -569,39 +569,79 @@ def init_routes(app, db, mail,
     def admin_roles():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
-        if not user.is_admin and "roles" not in get_user_modules(user):
+        if not check_module_access(user, "roles"):
             return redirect(url_for("dashboard"))
         return render_template("admin_roles.html", user=user)
     
-    @app.route("/admin/roles/users")
+    @app.route("/admin/roles/manage")
     @jwt_required()
-    def admin_roles_users():
+    def admin_roles_manage():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
         if not check_module_access(user, "roles"):
             return redirect(url_for("dashboard"))
+        roles = Role.query.order_by(Role.created_at.desc()).all()
+        return render_template("admin_roles_manage.html", user=user, roles=roles)
 
-        q        = request.args.get("q", "").strip()
-        f_role   = request.args.get("role", "")
-        f_status = request.args.get("status", "")
+    @app.route("/admin/roles/manage/create", methods=["POST"])
+    @jwt_required()
+    def admin_roles_manage_create():
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not check_module_access(admin, "roles"):
+            return jsonify({"error": "Sem permissão"}), 403
+        data = request.form
+        key  = data["key"].lower().strip().replace(" ", "_")
+        if Role.query.filter_by(key=key).first():
+            roles = Role.query.order_by(Role.created_at.desc()).all()
+            return render_template("admin_roles_manage.html",
+                                   user=admin, roles=roles,
+                                   error=f"A chave '{key}' já existe.")
+        role = Role(
+            key         = key,
+            label       = data["label"],
+            description = data.get("description", ""),
+            active      = True
+        )
+        db.session.add(role)
+        db.session.commit()
+        return redirect(url_for("admin_roles_manage"))
 
-        query = User.query.filter(User.is_admin == False)
-        if q:
-            query = query.filter(or_(
-                User.name.ilike(f"%{q}%"),
-                User.email.ilike(f"%{q}%")
-            ))
-        if f_role:
-            query = query.filter_by(role=f_role)
-        if f_status == "active":
-            query = query.filter_by(active=True)
-        elif f_status == "inactive":
-            query = query.filter_by(active=False)
+    @app.route("/admin/roles/manage/edit/<int:role_id>", methods=["POST"])
+    @jwt_required()
+    def admin_roles_manage_edit(role_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not check_module_access(admin, "roles"):
+            return jsonify({"error": "Sem permissão"}), 403
+        role             = Role.query.get_or_404(role_id)
+        data             = request.form
+        role.label       = data["label"]
+        role.description = data.get("description", "")
+        role.active      = data.get("active") == "on"
+        db.session.commit()
+        return redirect(url_for("admin_roles_manage"))
 
-        users = query.order_by(User.name).all()
-        return render_template("admin_roles_users.html",
-                               user=user, users=users,
-                               q=q, f_role=f_role, f_status=f_status)
+    @app.route("/admin/roles/manage/delete/<int:role_id>", methods=["POST"])
+    @jwt_required()
+    def admin_roles_manage_delete(role_id):
+        user_id = int(get_jwt_identity())
+        admin   = User.query.get(user_id)
+        if not check_module_access(admin, "roles"):
+            return jsonify({"error": "Sem permissão"}), 403
+        role = Role.query.get_or_404(role_id)
+        # Verifica se tem usuários com essa role
+        count = User.query.filter_by(role=role.key).count()
+        if count > 0:
+            roles = Role.query.order_by(Role.created_at.desc()).all()
+            return render_template("admin_roles_manage.html",
+                                   user=admin, roles=roles,
+                                   error=f"Não é possível excluir: {count} usuário(s) usam este perfil.")
+        RolePermission.query.filter_by(role=role.key).delete()
+        RoleModulePermission.query.filter_by(role=role.key).delete()
+        db.session.delete(role)
+        db.session.commit()
+        return redirect(url_for("admin_roles_manage"))
 
     @app.route("/admin/roles/toggle", methods=["POST"])
     @jwt_required()
@@ -742,7 +782,7 @@ def init_routes(app, db, mail,
     def get_role_permissions(role):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not check_module_access(admin, "permissions"):
+        if not admin.is_admin:
             return jsonify({"error": "Sem permissão"}), 403
 
         role_group_ids  = {rp.group_id  for rp in RolePermission.query.filter_by(role=role, report_id=None).all() if rp.group_id}
@@ -752,12 +792,12 @@ def init_routes(app, db, mail,
         groups  = Group.query.filter_by(active=True).order_by(Group.name).all()
         reports = Report.query.filter_by(active=True).order_by(Report.name).all()
 
-        role_labels = {"user": "Usuário comum", "gerente": "Gerente", "diretor": "Diretor"}
-        user_count  = User.query.filter_by(role=role, active=True).count()
+        role_obj   = Role.query.filter_by(key=role).first()
+        user_count = User.query.filter_by(role=role, active=True).count()
 
         return jsonify({
             "role":       role,
-            "label":      role_labels.get(role, role),
+            "label":      role_obj.label if role_obj else role,
             "user_count": user_count,
             "groups":     [{"id": g.id, "name": g.name, "active": g.id in role_group_ids} for g in groups],
             "reports":    [{"id": r.id, "name": r.name, "active": r.id in role_report_ids} for r in reports],
