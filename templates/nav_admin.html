@@ -1,59 +1,91 @@
 {% set path = request.path %}
 {% if user is defined %}
 
-  <a href="/dashboard"
-     class="pp-nav-link {% if path == '/dashboard' %}active{% endif %}">
-    Dashboard
-  </a>
+<a href="/dashboard"
+   class="pp-nav-link {% if path == '/dashboard' %}active{% endif %}">
+  Dashboard
+</a>
 
-  {% if user.is_admin or 'groups' in user_modules %}
-  <a href="/admin/groups"
-     class="pp-nav-link {% if path.startswith('/admin/groups') %}active{% endif %}">
-    Grupos
-  </a>
-  {% endif %}
-
-  {% if user.is_admin or 'reports' in user_modules %}
-  <a href="/admin/reports"
-     class="pp-nav-link {% if path.startswith('/admin/reports') %}active{% endif %}">
-    Relatórios
-  </a>
-  {% endif %}
-
-  {% if user.is_admin or 'users' in user_modules %}
-  <a href="/admin/users"
-     class="pp-nav-link {% if path.startswith('/admin/users') %}active{% endif %}">
+{% if user.is_admin or 'users' in user_modules or 'permissions' in user_modules %}
+<div class="pp-nav-dropdown">
+  <button class="pp-nav-dropdown-btn {% if path.startswith('/admin/users') or path.startswith('/admin/permissions') %}active{% endif %}">
     Usuários
-  </a>
-  {% endif %}
+    <svg viewBox="0 0 10 6" fill="none">
+      <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <div class="pp-nav-dropdown-menu">
+    <div class="pp-dropdown-label">Usuários</div>
+    {% if user.is_admin or 'users' in user_modules %}
+    <a href="/admin/users"
+       class="pp-dropdown-item {% if path.startswith('/admin/users') %}active{% endif %}">
+      <div class="pp-dropdown-item-icon">👥</div>
+      Cadastros
+    </a>
+    {% endif %}
+    {% if user.is_admin or 'permissions' in user_modules %}
+    <a href="/admin/permissions"
+       class="pp-dropdown-item {% if path.startswith('/admin/permissions') %}active{% endif %}">
+      <div class="pp-dropdown-item-icon">🔑</div>
+      Permissões
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
-  {% if user.is_admin or 'roles' in user_modules %}
-  <a href="/admin/roles"
-     class="pp-nav-link {% if path.startswith('/admin/roles') %}active{% endif %}">
+{% if user.is_admin or 'roles' in user_modules %}
+<div class="pp-nav-dropdown">
+  <button class="pp-nav-dropdown-btn {% if path.startswith('/admin/roles') %}active{% endif %}">
     Perfis
-  </a>
-  {% endif %}
+    <svg viewBox="0 0 10 6" fill="none">
+      <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <div class="pp-nav-dropdown-menu">
+    <div class="pp-dropdown-label">Perfis</div>
+    <a href="/admin/roles/users"
+       class="pp-dropdown-item {% if path == '/admin/roles/users' %}active{% endif %}">
+      <div class="pp-dropdown-item-icon">👥</div>
+      Cadastros
+    </a>
+    <a href="/admin/roles"
+       class="pp-dropdown-item {% if path == '/admin/roles' %}active{% endif %}">
+      <div class="pp-dropdown-item-icon">🔑</div>
+      Permissões
+    </a>
+  </div>
+</div>
+{% endif %}
 
-  {% if user.is_admin or 'permissions' in user_modules %}
-  <a href="/admin/permissions"
-     class="pp-nav-link {% if path.startswith('/admin/permissions') %}active{% endif %}">
-    Permissões
-  </a>
-  {% endif %}
+{% if user.is_admin or 'groups' in user_modules %}
+<a href="/admin/groups"
+   class="pp-nav-link {% if path.startswith('/admin/groups') %}active{% endif %}">
+  Grupos
+</a>
+{% endif %}
 
-  {% if user.is_admin or 'logs' in user_modules %}
-  <a href="/admin/logs"
-     class="pp-nav-link {% if path.startswith('/admin/logs') %}active{% endif %}">
-    Logs
-  </a>
-  {% endif %}
+{% if user.is_admin or 'reports' in user_modules %}
+<a href="/admin/reports"
+   class="pp-nav-link {% if path.startswith('/admin/reports') %}active{% endif %}">
+  Relatórios
+</a>
+{% endif %}
 
-  {% if user.is_admin or 'settings' in user_modules %}
-  <a href="/admin/settings"
-     class="pp-nav-link {% if path.startswith('/admin/settings') %}active{% endif %}">
-    Configurações
-  </a>
-  {% endif %}
+{% if user.is_admin or 'logs' in user_modules %}
+<a href="/admin/logs"
+   class="pp-nav-link {% if path.startswith('/admin/logs') %}active{% endif %}">
+  Logs
+</a>
+{% endif %}
+
+{% if user.is_admin or 'settings' in user_modules %}
+<a href="/admin/settings"
+   class="pp-nav-link {% if path.startswith('/admin/settings') %}active{% endif %}">
+  Configurações
+</a>
+{% endif %}
 
 {% endif %}
+
 <a href="/logout" class="pp-nav-link">Sair</a>

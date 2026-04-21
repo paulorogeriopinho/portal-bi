@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% block title %}Cadastro de Perfis{% endblock %}
+{% block nav_links %}{% include "nav_admin.html" %}{% endblock %}
+
+{% block extra_style %}
+<style>
+  {% set current_user = user %}
+  .filter-bar {
+    background: #fff; border-radius: 10px; border: 1px solid var(--pp-gray100);
+    padding: 14px 18px; margin-bottom: 20px;
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; min-width: 130px; flex: 1; }
+  .filter-group label { font-size: 11px; font-weight: 600; color: var(--pp-gray500); }
+  .filter-group input, .filter-group select {
+    padding: 7px 11px; border: 1px solid var(--pp-gray300); border-radius: 7px;
+    font-size: 13px; outline: none; background: #fff; color: var(--pp-navy);
+  }
+  .filter-group input:focus, .filter-group select:focus { border-color: var(--pp-cyan); }
+  .filter-actions { display: flex; gap: 8px; align-items: flex-end; }
+  .count-label { font-size: 12px; color: var(--pp-gray500); margin-bottom: 10px; }
+  .actions-cell { display: flex; gap: 6px; }
+  .role-section { margin-bottom: 32px; }
+  .role-section-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px; padding-bottom: 10px;
+    border-bottom: 2px solid var(--pp-gray100);
+  }
+  .role-section-icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .role-section-icon.user    { background: #f0fdf4; }
+  .role-section-icon.gerente { background: #fef3c7; }
+  .role-section-icon.diretor { background: #dbeafe; }
+  .role-section-title { font-size: 15px; font-weight: 700; color: var(--pp-navy); }
+  .role-section-count { font-size: 12px; color: var(--pp-gray500); margin-left: auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set current_user = user %}
+<div class="pp-container">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div>
+      <div class="pp-page-title">Cadastro de perfis</div>
+      <div class="pp-page-sub">Visualize e gerencie os usuários agrupados por perfil.</div>
+    </div>
+    <button class="pp-btn pp-btn-primary" onclick="ppOpenModal('modal-create')">+ Novo usuário</button>
+  </div>
+
+  <!-- Filtros -->
+  <form method="GET" action="/admin/roles/users">
+    <div class="filter-bar">
+      <div class="filter-group" style="flex:2">
+        <label>Buscar</label>
+        <input type="text" name="q" value="{{ q }}" placeholder="Nome ou email...">
+      </div>
+      <div class="filter-group">
+        <label>Perfil</label>
+        <select name="role">
+          <option value="">Todos</option>
+          <option value="user"    {% if f_role=='user'    %}selected{% endif %}>Usuário</option>
+          <option value="gerente" {% if f_role=='gerente' %}selected{% endif %}>Gerente</option>
+          <option value="diretor" {% if f_role=='diretor' %}selected{% endif %}>Diretor</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Status</label>
+        <select name="status">
+          <option value="">Todos</option>
+          <option value="active"   {% if f_status=='active'   %}selected{% endif %}>Ativo</option>
+          <option value="inactive" {% if f_status=='inactive' %}selected{% endif %}>Inativo</option>
+        </select>
+      </div>
+      <div class="filter-actions">
+        <button type="submit" class="pp-btn pp-btn-primary pp-btn-sm">Filtrar</button>
+        <a href="/admin/roles/users" class="pp-btn pp-btn-outline pp-btn-sm">Limpar</a>
+      </div>
+    </div>
+  </form>
+
+  <div class="count-label">{{ users|length }} usuário(s) encontrado(s)</div>
+
+  {% set roles_config = [
+    {'key': 'diretor',  'label': 'Diretores',       'icon': '👔', 'css': 'diretor'},
+    {'key': 'gerente',  'label': 'Gerentes',         'icon': '🏪', 'css': 'gerente'},
+    {'key': 'user',     'label': 'Usuários comuns',  'icon': '👤', 'css': 'user'},
+  ] %}
+
+  {% for rc in roles_config %}
+    {% set role_users = users | selectattr('role', 'equalto', rc.key) | list %}
+    {% if role_users or not f_role %}
+    <div class="role-section">
+      <div class="role-section-header">
+        <div class="role-section-icon {{ rc.css }}">{{ rc.icon }}</div>
+        <div class="role-section-title">{{ rc.label }}</div>
+        <span class="role-section-count">{{ role_users|length }} usuário(s)</span>
+      </div>
+
+      {% if role_users %}
+      <div class="pp-table-wrap">
+        <table class="pp-table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Revenda</th>
+              <th>Departamento</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in role_users %}
+            <tr>
+              <td><strong>{{ u.name }}</strong></td>
+              <td style="color:var(--pp-gray500)">{{ u.email }}</td>
+              <td>{{ u.empresa_revenda or '—' }}</td>
+              <td>{{ u.departamento or '—' }}</td>
+              <td>
+                {% if u.active %}
+                  <span class="pp-badge pp-badge-success">Ativo</span>
+                {% else %}
+                  <span class="pp-badge pp-badge-danger">Inativo</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="actions-cell">
+                  <button class="pp-btn pp-btn-outline pp-btn-sm" onclick="openEditModal(
+                    {{ u.id }},'{{ u.name }}','{{ u.email }}','{{ u.role }}',
+                    '{{ u.empresa_revenda or '' }}','{{ u.departamento or '' }}',
+                    {{ 'true' if u.is_admin else 'false' }},
+                    {{ 'true' if u.active else 'false' }}
+                  )">Editar</button>
+                  <form method="POST" action="/admin/users/toggle/{{ u.id }}" style="display:inline">
+                    <button class="pp-btn pp-btn-sm {% if u.active %}pp-btn-danger{% else %}pp-btn-outline{% endif %}">
+                      {% if u.active %}Desativar{% else %}Ativar{% endif %}
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="padding:20px;text-align:center;font-size:13px;color:var(--pp-gray300);background:#fff;border-radius:10px;border:1px solid var(--pp-gray100)">
+        Nenhum usuário com este perfil encontrado.
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<!-- Modal criar -->
+<div class="pp-modal-overlay" id="modal-create">
+  <div class="pp-modal">
+    <div class="pp-modal-header">
+      <div class="pp-modal-title">Novo usuário</div>
+      <div class="pp-modal-sub">Preencha os dados do novo usuário do portal.</div>
+    </div>
+    <form method="POST" action="/admin/users/create">
+      <label class="pp-label">Nome</label>
+      <input class="pp-input" type="text" name="name" required autofocus>
+      <label class="pp-label">Email</label>
+      <input class="pp-input" type="email" name="email" required>
+      <label class="pp-label">Senha</label>
+      <input class="pp-input" type="password" name="password" required placeholder="Mínimo 8 caracteres">
+      <label class="pp-label">Perfil</label>
+      <select class="pp-select" name="role">
+        <option value="user">Usuário comum</option>
+        <option value="gerente">Gerente</option>
+        <option value="diretor">Diretor</option>
+      </select>
+      <div class="pp-form-row">
+        <div>
+          <label class="pp-label">Código da revenda</label>
+          <input class="pp-input" type="text" name="empresa_revenda" placeholder="Ex: 1.18">
+        </div>
+        <div>
+          <label class="pp-label">Departamento</label>
+          <input class="pp-input" type="text" name="departamento" placeholder="Ex: Financeiro">
+        </div>
+      </div>
+      <div class="pp-checkbox-row">
+        <input type="checkbox" name="is_admin" id="create-is-admin">
+        <label for="create-is-admin" style="margin:0;font-weight:400">Administrador</label>
+      </div>
+      <div class="pp-modal-actions">
+        <button type="button" class="pp-btn pp-btn-outline" onclick="ppCloseModal('modal-create')">Cancelar</button>
+        <button type="submit" class="pp-btn pp-btn-primary">Criar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal editar -->
+<div class="pp-modal-overlay" id="modal-edit">
+  <div class="pp-modal">
+    <div class="pp-modal-header">
+      <div class="pp-modal-title">Editar usuário</div>
+    </div>
+    <form method="POST" id="form-edit">
+      <label class="pp-label">Nome</label>
+      <input class="pp-input" type="text" name="name" id="edit-name" required>
+      <label class="pp-label">Email</label>
+      <input class="pp-input" type="email" name="email" id="edit-email" required>
+      <label class="pp-label">Nova senha <span style="color:var(--pp-gray300);font-weight:400">(deixe em branco para manter)</span></label>
+      <input class="pp-input" type="password" name="password" placeholder="Mínimo 8 caracteres">
+      <label class="pp-label">Perfil</label>
+      <select class="pp-select" name="role" id="edit-role">
+        <option value="user">Usuário comum</option>
+        <option value="gerente">Gerente</option>
+        <option value="diretor">Diretor</option>
+      </select>
+      <div class="pp-form-row">
+        <div>
+          <label class="pp-label">Código da revenda</label>
+          <input class="pp-input" type="text" name="empresa_revenda" id="edit-revenda" placeholder="Ex: 1.18">
+        </div>
+        <div>
+          <label class="pp-label">Departamento</label>
+          <input class="pp-input" type="text" name="departamento" id="edit-depto" placeholder="Ex: Financeiro">
+        </div>
+      </div>
+      <div class="pp-checkbox-row">
+        <input type="checkbox" name="is_admin" id="edit-is-admin">
+        <label for="edit-is-admin" style="margin:0;font-weight:400">Administrador</label>
+      </div>
+      <div class="pp-checkbox-row">
+        <input type="checkbox" name="active" id="edit-active">
+        <label for="edit-active" style="margin:0;font-weight:400">Usuário ativo</label>
+      </div>
+      <div class="pp-modal-actions">
+        <button type="button" class="pp-btn pp-btn-outline" onclick="ppCloseModal('modal-edit')">Cancelar</button>
+        <button type="submit" class="pp-btn pp-btn-primary">Salvar alterações</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% block extra_script %}
+<script>
+  function openEditModal(id, name, email, role, revenda, depto, isAdmin, active) {
+    document.getElementById('form-edit').action       = '/admin/users/edit/' + id;
+    document.getElementById('edit-name').value        = name;
+    document.getElementById('edit-email').value       = email;
+    document.getElementById('edit-revenda').value     = revenda;
+    document.getElementById('edit-depto').value       = depto;
+    document.getElementById('edit-is-admin').checked  = isAdmin;
+    document.getElementById('edit-active').checked    = active;
+    var sel = document.getElementById('edit-role');
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === role) { sel.selectedIndex = i; break; }
+    }
+    ppOpenModal('modal-edit');
+  }
+</script>
+{% endblock %}
+{% endblock %}

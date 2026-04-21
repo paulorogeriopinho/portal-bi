@@ -572,6 +572,36 @@ def init_routes(app, db, mail,
         if not user.is_admin and "roles" not in get_user_modules(user):
             return redirect(url_for("dashboard"))
         return render_template("admin_roles.html", user=user)
+    
+    @app.route("/admin/roles/users")
+    @jwt_required()
+    def admin_roles_users():
+        user_id = int(get_jwt_identity())
+        user    = User.query.get(user_id)
+        if not check_module_access(user, "roles"):
+            return redirect(url_for("dashboard"))
+
+        q        = request.args.get("q", "").strip()
+        f_role   = request.args.get("role", "")
+        f_status = request.args.get("status", "")
+
+        query = User.query.filter(User.is_admin == False)
+        if q:
+            query = query.filter(or_(
+                User.name.ilike(f"%{q}%"),
+                User.email.ilike(f"%{q}%")
+            ))
+        if f_role:
+            query = query.filter_by(role=f_role)
+        if f_status == "active":
+            query = query.filter_by(active=True)
+        elif f_status == "inactive":
+            query = query.filter_by(active=False)
+
+        users = query.order_by(User.name).all()
+        return render_template("admin_roles_users.html",
+                               user=user, users=users,
+                               q=q, f_role=f_role, f_status=f_status)
 
     @app.route("/admin/roles/toggle", methods=["POST"])
     @jwt_required()
