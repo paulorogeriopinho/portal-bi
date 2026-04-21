@@ -114,6 +114,7 @@ def init_models(db):
         key         = db.Column(db.String(50), unique=True, nullable=False)
         label       = db.Column(db.String(100), nullable=False)
         description = db.Column(db.String(300))
+        color       = db.Column(db.String(7), default='#7A8899') 
         active      = db.Column(db.Boolean, default=True)
         created_at  = db.Column(db.DateTime, default=datetime.utcnow)
 

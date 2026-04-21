@@ -590,17 +590,31 @@ def init_routes(app, db, mail,
         admin   = User.query.get(user_id)
         if not check_module_access(admin, "roles"):
             return jsonify({"error": "Sem permissão"}), 403
+
         data = request.form
         key  = data["key"].lower().strip().replace(" ", "_")
+
         if Role.query.filter_by(key=key).first():
             roles = Role.query.order_by(Role.created_at.desc()).all()
             return render_template("admin_roles_manage.html",
                                    user=admin, roles=roles,
                                    error=f"A chave '{key}' já existe.")
+
+        # Paleta de cores para novos perfis
+        PALETTE = [
+            '#0F6E56', '#1E40AF', '#92400E', '#5B21B6',
+            '#065F46', '#9D174D', '#1E3A5F', '#713F12',
+            '#166534', '#7C3AED', '#0369A1', '#B45309',
+        ]
+        used_colors = {r.color for r in Role.query.all()}
+        available   = [c for c in PALETTE if c not in used_colors]
+        color       = available[0] if available else PALETTE[len(Role.query.all()) % len(PALETTE)]
+
         role = Role(
             key         = key,
             label       = data["label"],
             description = data.get("description", ""),
+            color       = color,
             active      = True
         )
         db.session.add(role)
@@ -618,6 +632,7 @@ def init_routes(app, db, mail,
         data             = request.form
         role.label       = data["label"]
         role.description = data.get("description", "")
+        role.color       = data.get("color", role.color)
         role.active      = data.get("active") == "on"
         db.session.commit()
         return redirect(url_for("admin_roles_manage"))

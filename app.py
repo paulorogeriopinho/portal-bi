@@ -50,6 +50,16 @@ def user_count_filter(role_key):
     except Exception:
         return 0
 
+@app.template_filter('role_info')
+def role_info_filter(role_key):
+    try:
+        r = Role.query.filter_by(key=role_key).first()
+        if r:
+            return {"label": r.label, "color": r.color}
+        return {"label": role_key, "color": "#7A8899"}
+    except Exception:
+        return {"label": role_key, "color": "#7A8899"}
+
 def get_portal_settings():
     """Retorna dict com todas as configurações do portal."""
     rows = PortalSettings.query.all()

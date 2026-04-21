@@ -94,13 +94,12 @@
           <td style="color:var(--pp-gray500)">{{ u.email }}</td>
           <td>
             {% if u.is_admin %}
-              <span class="pp-badge pp-badge-navy">Admin</span>
-            {% elif u.role == 'gerente' %}
-              <span class="pp-badge pp-badge-warn">Gerente</span>
-            {% elif u.role == 'diretor' %}
-              <span class="pp-badge pp-badge-blue">Diretor</span>
+              <span class="pp-badge" style="background:#1a1a2e;color:#fff">Admin</span>
             {% else %}
-              <span class="pp-badge pp-badge-cyan">Usuário</span>
+              {% set ri = u.role | role_info %}
+              <span class="pp-badge" style="background:{{ ri.color }}20;color:{{ ri.color }};border:1px solid {{ ri.color }}40">
+                {{ ri.label }}
+              </span>
             {% endif %}
           </td>
           <td>{{ u.empresa_revenda or '—' }}</td>

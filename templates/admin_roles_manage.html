@@ -8,6 +8,9 @@
   .actions-cell { display: flex; gap: 6px; }
   .key-pill { font-family: monospace; font-size: 12px; background: var(--pp-gray100); color: var(--pp-gray700); padding: 2px 8px; border-radius: 5px; }
   .error-alert { background: #FEE2E2; border: 1px solid #FECACA; color: #991B1B; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 20px; }
+  /* Estilo para o input de cor ficar mais elegante */
+  .color-picker-container { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .pp-input-color { width: 44px; height: 36px; border: 1px solid var(--pp-gray300); border-radius: 7px; cursor: pointer; padding: 2px; }
 </style>
 {% endblock %}
 
@@ -30,9 +33,7 @@
     <span>ℹ️</span>
     <span>
       A <strong>chave</strong> do perfil é usada internamente e não pode ser alterada após a criação.
-      Use letras minúsculas e underline. Ex: <code style="background:#dbeafe;padding:1px 5px;border-radius:4px">supervisor</code>,
-      <code style="background:#dbeafe;padding:1px 5px;border-radius:4px">analista_bi</code>.
-      Perfis com usuários vinculados não podem ser excluídos.
+      Use letras minúsculas e underline. Perfis com usuários vinculados não podem ser excluídos.
     </span>
   </div>
 
@@ -40,19 +41,21 @@
     <table class="pp-table">
       <thead>
         <tr>
-          <th>Label</th>
-          <th>Chave (key)</th>
+          <th>Perfil</th> <th>Chave (key)</th>
           <th>Descrição</th>
           <th>Usuários</th>
           <th>Status</th>
-          <th>Criado em</th>
           <th>Ações</th>
         </tr>
       </thead>
       <tbody>
         {% for r in roles %}
         <tr>
-          <td><strong>{{ r.label }}</strong></td>
+          <td>
+            <span class="pp-badge" style="background:{{ r.color }}20; color:{{ r.color }}; border:1px solid {{ r.color }}40">
+              {{ r.label }}
+            </span>
+          </td>
           <td><span class="key-pill">{{ r.key }}</span></td>
           <td style="color:var(--pp-gray500)">{{ r.description or '—' }}</td>
           <td>
@@ -67,11 +70,10 @@
               <span class="pp-badge pp-badge-danger">Inativo</span>
             {% endif %}
           </td>
-          <td style="color:var(--pp-gray500);font-size:12px">{{ r.created_at.strftime('%d/%m/%Y') }}</td>
           <td>
             <div class="actions-cell">
               <button class="pp-btn pp-btn-outline pp-btn-sm"
-                onclick="openEdit({{ r.id }},'{{ r.label }}','{{ r.description or '' }}',{{ 'true' if r.active else 'false' }})">
+                onclick="openEdit({{ r.id }},'{{ r.label }}','{{ r.description or '' }}','{{ r.color }}',{{ 'true' if r.active else 'false' }})">
                 Editar
               </button>
               <form method="POST" action="/admin/roles/manage/delete/{{ r.id }}"
@@ -87,24 +89,27 @@
   </div>
 </div>
 
-<!-- Modal criar -->
 <div class="pp-modal-overlay" id="modal-create">
   <div class="pp-modal">
     <div class="pp-modal-header">
       <div class="pp-modal-title">Novo perfil</div>
-      <div class="pp-modal-sub">Crie um novo perfil de acesso para o sistema.</div>
     </div>
     <form method="POST" action="/admin/roles/manage/create">
-      <label class="pp-label">Label <span style="color:var(--pp-gray500);font-weight:400">(nome exibido)</span></label>
-      <input class="pp-input" type="text" name="label" placeholder="Ex: Supervisor" required autofocus
-        oninput="generateKey(this.value)">
-      <label class="pp-label">Chave (key) <span style="color:var(--pp-gray500);font-weight:400">(gerada automaticamente)</span></label>
-      <input class="pp-input" type="text" name="key" id="key-input"
-        placeholder="supervisor" required
-        pattern="[a-z0-9_]+" title="Apenas letras minúsculas, números e underline">
-      <p class="pp-hint">Única, imutável após criação. Letras minúsculas e underline apenas.</p>
-      <label class="pp-label">Descrição <span style="color:var(--pp-gray300);font-weight:400">(opcional)</span></label>
-      <textarea class="pp-textarea" name="description" placeholder="Descreva as responsabilidades deste perfil"></textarea>
+      <label class="pp-label">Label</label>
+      <input class="pp-input" type="text" name="label" placeholder="Ex: Supervisor" required oninput="generateKey(this.value)">
+      
+      <label class="pp-label">Chave (key)</label>
+      <input class="pp-input" type="text" name="key" id="key-input" required pattern="[a-z0-9_]+">
+
+      <label class="pp-label">Cor do badge</label>
+      <div class="color-picker-container">
+        <input type="color" name="color" value="#7A8899" class="pp-input-color">
+        <span style="font-size:12px;color:var(--pp-gray500)">Cor exibida no badge do perfil</span>
+      </div>
+
+      <label class="pp-label">Descrição</label>
+      <textarea class="pp-textarea" name="description"></textarea>
+
       <div class="pp-modal-actions">
         <button type="button" class="pp-btn pp-btn-outline" onclick="ppCloseModal('modal-create')">Cancelar</button>
         <button type="submit" class="pp-btn pp-btn-primary">Criar perfil</button>
@@ -113,22 +118,29 @@
   </div>
 </div>
 
-<!-- Modal editar -->
 <div class="pp-modal-overlay" id="modal-edit">
   <div class="pp-modal">
     <div class="pp-modal-header">
       <div class="pp-modal-title">Editar perfil</div>
-      <div class="pp-modal-sub">A chave não pode ser alterada.</div>
     </div>
     <form method="POST" id="form-edit">
       <label class="pp-label">Label</label>
       <input class="pp-input" type="text" name="label" id="edit-label" required>
+
+      <label class="pp-label">Cor do badge</label>
+      <div class="color-picker-container">
+        <input type="color" name="color" id="edit-color" class="pp-input-color">
+        <span style="font-size:12px;color:var(--pp-gray500)">Alterar cor do perfil</span>
+      </div>
+
       <label class="pp-label">Descrição</label>
       <textarea class="pp-textarea" name="description" id="edit-description"></textarea>
+      
       <div class="pp-checkbox-row">
         <input type="checkbox" name="active" id="edit-active">
-        <label for="edit-active" style="margin:0;font-weight:400">Perfil ativo</label>
+        <label for="edit-active">Perfil ativo</label>
       </div>
+
       <div class="pp-modal-actions">
         <button type="button" class="pp-btn pp-btn-outline" onclick="ppCloseModal('modal-edit')">Cancelar</button>
         <button type="submit" class="pp-btn pp-btn-primary">Salvar</button>
@@ -147,11 +159,13 @@
     document.getElementById('key-input').value = key;
   }
 
-  function openEdit(id, label, description, active) {
-    document.getElementById('form-edit').action          = '/admin/roles/manage/edit/' + id;
-    document.getElementById('edit-label').value          = label;
-    document.getElementById('edit-description').value    = description;
-    document.getElementById('edit-active').checked       = active;
+  // Atualizado para receber a cor
+  function openEdit(id, label, description, color, active) {
+    document.getElementById('form-edit').action       = '/admin/roles/manage/edit/' + id;
+    document.getElementById('edit-label').value       = label;
+    document.getElementById('edit-description').value = description;
+    document.getElementById('edit-color').value       = color; // Seta a cor no input color
+    document.getElementById('edit-active').checked    = active;
     ppOpenModal('modal-edit');
   }
 </script>

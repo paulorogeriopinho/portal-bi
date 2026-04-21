@@ -69,10 +69,10 @@
 
   <div class="pp-split pp-card" style="min-height:520px">
     <div class="pp-split-left">
-      <div class="panel-title">Perfis cadastrados</div>
+      <div class="panel-title">Perfis do sistema</div>
       {% for r in active_roles %}
-      <div class="role-item" onclick="selectRole('{{ r.key }}', this)">
-        <div class="role-icon" style="background:var(--pp-ice);font-size:16px">🎭</div>
+      <div class="role-item" onclick="selectRole('{{ r.key }}', '{{ r.label }}', this)">
+        <div class="role-icon" style="background:{{ r.color }}20; color:{{ r.color }}">🎭</div>
         <div>
           <div class="role-meta-name">{{ r.label }}</div>
           <div class="role-meta-count" id="count-{{ r.key }}">carregando...</div>
@@ -99,7 +99,7 @@
   var searchQuery = '';
   var allModules  = [];
 
-  // Carrega contagens dinamicamente
+  // Carrega contagens de usuários dinamicamente para cada perfil ativo
   {% for r in active_roles %}
   fetch('/admin/permissions/role/{{ r.key }}')
     .then(function(res) { return res.json(); })
@@ -109,23 +109,28 @@
     });
   {% endfor %}
 
-  function selectRole(role, el) {
+  // Adicione o parâmetro 'label' na assinatura da função
+  function selectRole(role, label, el) {
     currentRole = role; currentTab = 'groups'; searchQuery = '';
+    
+    // UI: Marcar selecionado
     document.querySelectorAll('.role-item').forEach(function(i) { i.classList.remove('selected'); });
     el.classList.add('selected');
-    var labels = { user: 'Usuário comum', gerente: 'Gerente', diretor: 'Diretor' };
+    
+    // Atualizar Header do Painel Direito com o label vindo do banco
     document.getElementById('right-panel').innerHTML =
       '<div class="right-header">' +
-        '<div class="right-title">Perfil: ' + labels[role] + '</div>' +
+        '<div class="right-title">Perfil: ' + label + '</div>' + // <-- Label agora é dinâmico
         '<div class="right-sub">Acessos padrão para todos os usuários deste perfil</div>' +
       '</div>' +
       '<div class="pp-tabs">' +
         '<button class="pp-tab-btn active" id="rtab-groups"  onclick="switchTab(\'groups\')">Grupos</button>' +
-        '<button class="pp-tab-btn"        id="rtab-reports" onclick="switchTab(\'reports\')">Relatórios</button>' +
-        '<button class="pp-tab-btn"        id="rtab-modules" onclick="switchTab(\'modules\')">Módulos do sistema</button>' +
+        '<button class="pp-tab-btn"         id="rtab-reports" onclick="switchTab(\'reports\')">Relatórios</button>' +
+        '<button class="pp-tab-btn"         id="rtab-modules" onclick="switchTab(\'modules\')">Módulos do sistema</button>' +
       '</div>' +
       '<div class="list-search"><input id="role-item-search" placeholder="Buscar..." oninput="filterRoleItems()"/></div>' +
       '<div class="item-list" id="role-item-list"><div class="loading">Carregando...</div></div>';
+    
     loadRolePermissions(role);
   }
 
