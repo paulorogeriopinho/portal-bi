@@ -138,6 +138,15 @@ def init_routes(app, db, mail,
                 return True
         return False
 
+    def check_module_access(user, module_key):
+        """Retorna True se o usuário tem acesso ao módulo."""
+        if user.is_admin:
+            return True
+        # settings e roles são exclusivos do admin
+        if module_key in ("settings", "roles"):
+            return False
+        return module_key in get_user_modules(user)
+
     # ── Auth ─────────────────────────────────────────────────────
 
     @app.route("/")
@@ -257,7 +266,7 @@ def init_routes(app, db, mail,
     def admin_create_user():
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "users"):
             return jsonify({"error": "Sem permissão"}), 403
         data     = request.form
         new_user = User(
@@ -280,7 +289,7 @@ def init_routes(app, db, mail,
     def admin_edit_user(target_id):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "users"):
             return jsonify({"error": "Sem permissão"}), 403
         data = request.form
         u    = User.query.get_or_404(target_id)
@@ -302,7 +311,7 @@ def init_routes(app, db, mail,
     def admin_toggle_user(target_id):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "users"):
             return jsonify({"error": "Sem permissão"}), 403
         u        = User.query.get_or_404(target_id)
         u.active = not u.active
@@ -328,7 +337,7 @@ def init_routes(app, db, mail,
     def admin_create_report():
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "reports"):
             return jsonify({"error": "Sem permissão"}), 403
         data = request.form
         new_report = Report(
@@ -348,7 +357,7 @@ def init_routes(app, db, mail,
     def admin_edit_report(report_id):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "reports"):
             return jsonify({"error": "Sem permissão"}), 403
         report              = Report.query.get_or_404(report_id)
         data                = request.form
@@ -365,7 +374,7 @@ def init_routes(app, db, mail,
     def admin_toggle_report(report_id):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "reports"):
             return jsonify({"error": "Sem permissão"}), 403
         report        = Report.query.get_or_404(report_id)
         report.active = not report.active
@@ -377,7 +386,7 @@ def init_routes(app, db, mail,
     def admin_delete_report(report_id):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "reports"):
             return jsonify({"error": "Sem permissão"}), 403
         Permission.query.filter_by(report_id=report_id).delete()
         RolePermission.query.filter_by(report_id=report_id).delete()
@@ -392,7 +401,7 @@ def init_routes(app, db, mail,
     def admin_save_rls(report_id):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "reports"):
             return jsonify({"error": "Sem permissão"}), 403
         report = Report.query.get_or_404(report_id)
         data   = request.form
@@ -423,7 +432,7 @@ def init_routes(app, db, mail,
     def admin_delete_rls(report_id, rls_id):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "reports"):
             return jsonify({"error": "Sem permissão"}), 403
         ReportRLS.query.filter_by(id=rls_id).delete()
         if ReportRLS.query.filter_by(report_id=report_id).count() == 0:
@@ -457,7 +466,7 @@ def init_routes(app, db, mail,
     def admin_create_group():
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "groups"):
             return jsonify({"error": "Sem permissão"}), 403
         data  = request.form
         group = Group(name=data["name"], description=data.get("description", ""), active=True)
@@ -473,7 +482,7 @@ def init_routes(app, db, mail,
     def admin_edit_group(group_id):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "groups"):
             return jsonify({"error": "Sem permissão"}), 403
         group             = Group.query.get_or_404(group_id)
         data              = request.form
@@ -490,7 +499,7 @@ def init_routes(app, db, mail,
     def admin_toggle_group(group_id):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "groups"):
             return jsonify({"error": "Sem permissão"}), 403
         group        = Group.query.get_or_404(group_id)
         group.active = not group.active
@@ -502,7 +511,7 @@ def init_routes(app, db, mail,
     def admin_delete_group(group_id):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "groups"):
             return jsonify({"error": "Sem permissão"}), 403
         ReportGroup.query.filter_by(group_id=group_id).delete()
         Permission.query.filter_by(group_id=group_id).delete()
@@ -528,7 +537,7 @@ def init_routes(app, db, mail,
     def toggle_permission():
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "permissions"):
             return jsonify({"error": "Sem permissão"}), 403
         data       = request.json
         target_uid = data["user_id"]
@@ -569,7 +578,7 @@ def init_routes(app, db, mail,
     def toggle_role_permission():
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "roles"):
             return jsonify({"error": "Sem permissão"}), 403
         data      = request.json
         role      = data["role"]
@@ -703,7 +712,7 @@ def init_routes(app, db, mail,
     def get_role_permissions(role):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "permissions"):
             return jsonify({"error": "Sem permissão"}), 403
 
         role_group_ids  = {rp.group_id  for rp in RolePermission.query.filter_by(role=role, report_id=None).all() if rp.group_id}
@@ -730,7 +739,7 @@ def init_routes(app, db, mail,
     def toggle_role_module():
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "roles"):
             return jsonify({"error": "Sem permissão"}), 403
         data   = request.json
         role   = data["role"]
@@ -749,7 +758,7 @@ def init_routes(app, db, mail,
     def get_user_permissions(target_id):
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "permissions"):
             return jsonify({"error": "Sem permissão"}), 403
 
         target = User.query.get_or_404(target_id)
@@ -799,7 +808,7 @@ def init_routes(app, db, mail,
     def toggle_user_module():
         user_id = int(get_jwt_identity())
         admin   = User.query.get(user_id)
-        if not admin.is_admin:
+        if not check_module_access(admin, "permissions"):
             return jsonify({"error": "Sem permissão"}), 403
         data      = request.json
         target_id = data["user_id"]
@@ -820,7 +829,7 @@ def init_routes(app, db, mail,
     def admin_settings():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
-        if not user.is_admin and "settings" not in get_user_modules(user):
+        if not check_module_access(user, "settings"):
             return redirect(url_for("dashboard"))
 
         if request.method == "POST":
