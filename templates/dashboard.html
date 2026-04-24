@@ -5,25 +5,65 @@
 {% block extra_style %}
 <style>
   {% set current_user = user %}
-  .pp-welcome { margin-bottom: 28px; }
+  .pp-welcome { margin-bottom: 24px; }
   .pp-welcome h1 { font-size: 22px; font-weight: 700; color: var(--pp-navy); }
   .pp-welcome p  { font-size: 13px; color: var(--pp-gray500); margin-top: 5px; }
 
+  /* Barra de busca */
+  .search-bar {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 28px; flex-wrap: wrap;
+  }
+  .search-wrap {
+    flex: 1; min-width: 200px; position: relative;
+  }
+  .search-wrap svg {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    width: 15px; height: 15px; color: var(--pp-gray300); pointer-events: none;
+  }
+  .search-input-field {
+    width: 100%; padding: 9px 36px 9px 34px;
+    border: 1px solid var(--pp-gray100); border-radius: 8px;
+    font-size: 13px; outline: none; background: #fff;
+    color: var(--pp-navy); transition: border-color 0.15s;
+    box-shadow: 0 1px 3px rgba(13,27,42,0.04);
+  }
+  .search-input-field:focus { border-color: var(--pp-accent); }
+  .search-clear {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; color: var(--pp-gray300);
+    font-size: 16px; line-height: 1; display: none; padding: 2px;
+  }
+  .search-clear:hover { color: var(--pp-gray500); }
+  .group-filter {
+    padding: 9px 14px; border: 1px solid var(--pp-gray100);
+    border-radius: 8px; font-size: 13px; outline: none;
+    background: #fff; color: var(--pp-navy); cursor: pointer;
+    transition: border-color 0.15s; min-width: 160px;
+    box-shadow: 0 1px 3px rgba(13,27,42,0.04);
+  }
+  .group-filter:focus { border-color: var(--pp-accent); }
+  .search-results-count {
+    font-size: 12px; color: var(--pp-gray500); white-space: nowrap;
+  }
+  .search-results-count strong { color: var(--pp-navy); }
+
+  /* Seção label */
   .pp-section-label {
     display: flex; align-items: center; gap: 10px;
     font-size: 11px; font-weight: 700; color: var(--pp-gray500);
-    text-transform: uppercase; letter-spacing: 0.5px;
-    margin-bottom: 14px;
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;
   }
   .pp-section-label::after { content:''; flex:1; height:1px; background:var(--pp-gray100); }
 
+  /* Grid */
   .pp-report-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 14px; margin-bottom: 32px;
   }
 
-  /* Card base */
+  /* Cards */
   .pp-report-card {
     background: #fff; border-radius: 10px; padding: 20px;
     border: 1px solid var(--pp-gray100); text-decoration: none; color: inherit;
@@ -35,22 +75,21 @@
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(13,27,42,0.08);
   }
-
-  /* Card favorito — borda superior colorida */
-  .pp-report-card.is-favorite {
-    border-top: 3px solid var(--pp-accent);
-  }
+  .pp-report-card.is-favorite { border-top: 3px solid var(--pp-accent); }
+  .pp-report-card.hidden { display: none; }
 
   .pp-report-card-icon {
     width: 38px; height: 38px; border-radius: 9px;
     display: flex; align-items: center; justify-content: center;
-    margin-bottom: 12px; font-size: 18px;
-    background: var(--pp-ice);
+    margin-bottom: 12px; font-size: 18px; background: var(--pp-ice);
   }
   .pp-report-card-name { font-size: 14px; font-weight: 600; color: var(--pp-navy); margin-bottom: 4px; }
   .pp-report-card-desc { font-size: 12px; color: var(--pp-gray500); line-height: 1.5; }
 
-  /* Botão de favorito */
+  /* Highlight de busca */
+  .search-highlight { background: #FEF08A; border-radius: 2px; padding: 0 1px; }
+
+  /* Favorito botão */
   .fav-btn {
     position: absolute; top: 12px; right: 12px;
     width: 28px; height: 28px; border-radius: 50%;
@@ -66,27 +105,35 @@
   /* Seção favoritos */
   .fav-section { margin-bottom: 32px; }
   .fav-header {
-    display: flex; align-items: center; gap: 10px;
-    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
   }
   .fav-title {
     font-size: 11px; font-weight: 700; color: var(--pp-gray500);
     text-transform: uppercase; letter-spacing: 0.5px;
-    display: flex; align-items: center; gap: 8px;
   }
-  .fav-title::after { content:''; flex:1; height:1px; background:var(--pp-gray100); }
   .fav-count {
-    font-size: 11px; font-weight: 600; background: #FEF3C7;
-    color: #92400E; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600;
+    background: #FEF3C7; color: #92400E;
+    padding: 2px 8px; border-radius: 10px;
   }
-  .fav-hint {
-    font-size: 11px; color: var(--pp-gray300);
-    margin-bottom: 12px; font-style: italic;
-  }
+  .fav-line { flex: 1; height: 1px; background: var(--pp-gray100); }
+  .fav-hint { font-size: 11px; color: var(--pp-gray300); margin-bottom: 12px; font-style: italic; }
 
-  /* Drag and drop */
-  .pp-report-grid.sortable-active .pp-report-card { cursor: grab; }
-  .pp-report-card.sortable-ghost { opacity: 0.4; border: 2px dashed var(--pp-accent); }
+  /* Grupo section */
+  .group-section { margin-bottom: 4px; }
+  .group-section.hidden { display: none; }
+
+  /* Empty state busca */
+  .search-empty {
+    display: none; text-align: center;
+    padding: 60px 20px; color: var(--pp-gray300);
+  }
+  .search-empty.visible { display: block; }
+  .search-empty-icon { font-size: 36px; margin-bottom: 10px; }
+  .search-empty p { font-size: 14px; }
+
+  /* Drag */
+  .pp-report-card.sortable-ghost  { opacity: 0.4; border: 2px dashed var(--pp-accent); }
   .pp-report-card.sortable-chosen { box-shadow: 0 8px 24px rgba(13,27,42,0.15); transform: scale(1.02); }
 
   .pp-group-icon {
@@ -99,10 +146,46 @@
 {% block content %}
 {% set current_user = user %}
 <div class="pp-container">
+
   <div class="pp-welcome">
     <h1>Olá, {{ user.name.split()[0] }}</h1>
     <p>Bem-vindo ao portal de Business Intelligence{% if portal.company_name %} · {{ portal.company_name }}{% endif %}</p>
   </div>
+
+  {% if groups_data or loose_reports or fav_reports %}
+  <!-- Barra de busca -->
+  <div class="search-bar">
+    <div class="search-wrap">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="8.5" cy="8.5" r="5.5"/><path d="M15 15l-3-3" stroke-linecap="round"/>
+      </svg>
+      <input class="search-input-field" id="search-input"
+        type="text" placeholder="Buscar relatório..."
+        oninput="applyFilters()" autocomplete="off">
+      <button class="search-clear" id="search-clear" onclick="clearSearch()">×</button>
+    </div>
+
+    <select class="group-filter" id="group-filter" onchange="applyFilters()">
+      <option value="">Todos os grupos</option>
+      {% if fav_reports %}
+      <option value="__favs__">⭐ Favoritos</option>
+      {% endif %}
+      {% for item in groups_data %}
+      <option value="group-{{ item.group.id }}">📁 {{ item.group.name }}</option>
+      {% endfor %}
+      {% if loose_reports %}
+      <option value="__loose__">Outros relatórios</option>
+      {% endif %}
+    </select>
+
+    <button class="pp-btn pp-btn-outline pp-btn-sm" id="btn-clear-filters"
+      onclick="clearSearch()" style="display:none;white-space:nowrap">
+      ✕ Limpar filtros
+    </button>
+
+    <span class="search-results-count" id="results-count"></span>
+  </div>
+  {% endif %}
 
   {% if not groups_data and not loose_reports and not fav_reports %}
   <div class="pp-card" style="padding:60px;text-align:center">
@@ -112,20 +195,22 @@
   </div>
   {% endif %}
 
+  <!-- Favoritos -->
   {% if fav_reports %}
-  <div class="fav-section">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-      <div class="fav-title" style="flex:1">
-        ⭐ Favoritos
-      </div>
-      <span class="fav-count">{{ fav_reports|length }}</span>
-      <div style="flex:1;height:1px;background:var(--pp-gray100)"></div>
+  <div class="fav-section group-section" id="section-favs" data-section="__favs__">
+    <div class="fav-header">
+      <span class="fav-title">⭐ Favoritos</span>
+      <span class="fav-count" id="fav-count-badge">{{ fav_reports|length }}</span>
+      <div class="fav-line"></div>
     </div>
-    <div class="fav-hint">Arraste os cards para reordenar seus favoritos.</div>
+    <div class="fav-hint">Arraste os cards para reordenar.</div>
     <div class="pp-report-grid sortable-active" id="fav-grid">
       {% for report in fav_reports %}
-      <a href="/report/{{ report.id }}" class="pp-report-card is-favorite"
-         data-report-id="{{ report.id }}">
+      <a href="/report/{{ report.id }}"
+         class="pp-report-card is-favorite"
+         data-report-id="{{ report.id }}"
+         data-name="{{ report.name | lower }}"
+         data-section="__favs__">
         <button class="fav-btn active" title="Remover dos favoritos"
           onclick="toggleFav(event, {{ report.id }}, this)">★</button>
         <div class="pp-report-card-icon">
@@ -145,102 +230,227 @@
   </div>
   {% endif %}
 
+  <!-- Grupos -->
   {% for item in groups_data %}
-  <div class="pp-section-label">
-    <span class="pp-group-icon">
-      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-        <rect x="1" y="1" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
-        <rect x="7.5" y="1" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
-        <rect x="1" y="7.5" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
-        <rect x="7.5" y="7.5" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
-      </svg>
-    </span>
-    {{ item.group.name }}
-  </div>
-  {% if item.group.description %}
-  <p style="font-size:12px;color:var(--pp-gray500);margin:-8px 0 14px">{{ item.group.description }}</p>
-  {% endif %}
-  <div class="pp-report-grid">
-    {% for report in item.reports %}
-    <a href="/report/{{ report.id }}" class="pp-report-card {% if report.id in fav_ids %}is-favorite{% endif %}">
-      <button class="fav-btn {% if report.id in fav_ids %}active{% endif %}"
-        title="{% if report.id in fav_ids %}Remover dos favoritos{% else %}Adicionar aos favoritos{% endif %}"
-        onclick="toggleFav(event, {{ report.id }}, this)">
-        {% if report.id in fav_ids %}★{% else %}☆{% endif %}
-      </button>
-      <div class="pp-report-card-icon">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <rect x="3" y="11" width="3" height="7" rx="1" fill="#00A8CC"/>
-          <rect x="8.5" y="7" width="3" height="11" rx="1" fill="#1B4F8A"/>
-          <rect x="14" y="3" width="3" height="15" rx="1" fill="#0D1B2A"/>
+  <div class="group-section" id="section-group-{{ item.group.id }}" data-section="group-{{ item.group.id }}">
+    <div class="pp-section-label">
+      <span class="pp-group-icon">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+          <rect x="1" y="1" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
+          <rect x="7.5" y="1" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
+          <rect x="1" y="7.5" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
+          <rect x="7.5" y="7.5" width="4.5" height="4.5" rx="1" fill="#7A8899"/>
         </svg>
-      </div>
-      <div class="pp-report-card-name">{{ report.name }}</div>
-      {% if report.description %}
-      <div class="pp-report-card-desc">{{ report.description }}</div>
-      {% endif %}
-    </a>
-    {% endfor %}
+      </span>
+      {{ item.group.name }}
+      <span id="group-count-{{ item.group.id }}"
+        style="font-size:11px;font-weight:400;color:var(--pp-gray300);text-transform:none;letter-spacing:0">
+      </span>
+    </div>
+    {% if item.group.description %}
+    <p style="font-size:12px;color:var(--pp-gray500);margin:-8px 0 14px">{{ item.group.description }}</p>
+    {% endif %}
+    <div class="pp-report-grid" id="grid-group-{{ item.group.id }}">
+      {% for report in item.reports %}
+      <a href="/report/{{ report.id }}"
+         class="pp-report-card {% if report.id in fav_ids %}is-favorite{% endif %}"
+         data-report-id="{{ report.id }}"
+         data-name="{{ report.name | lower }}"
+         data-section="group-{{ item.group.id }}">
+        <button class="fav-btn {% if report.id in fav_ids %}active{% endif %}"
+          title="{% if report.id in fav_ids %}Remover dos favoritos{% else %}Adicionar aos favoritos{% endif %}"
+          onclick="toggleFav(event, {{ report.id }}, this)">
+          {% if report.id in fav_ids %}★{% else %}☆{% endif %}
+        </button>
+        <div class="pp-report-card-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="3" y="11" width="3" height="7" rx="1" fill="#00A8CC"/>
+            <rect x="8.5" y="7" width="3" height="11" rx="1" fill="#1B4F8A"/>
+            <rect x="14" y="3" width="3" height="15" rx="1" fill="#0D1B2A"/>
+          </svg>
+        </div>
+        <div class="pp-report-card-name">{{ report.name }}</div>
+        {% if report.description %}
+        <div class="pp-report-card-desc">{{ report.description }}</div>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
   </div>
   {% endfor %}
 
+  <!-- Outros relatórios -->
   {% if loose_reports %}
-  {% if groups_data or fav_reports %}
-  <div class="pp-section-label" style="margin-top:8px">Outros relatórios</div>
-  {% endif %}
-  <div class="pp-report-grid">
-    {% for report in loose_reports %}
-    <a href="/report/{{ report.id }}" class="pp-report-card {% if report.id in fav_ids %}is-favorite{% endif %}">
-      <button class="fav-btn {% if report.id in fav_ids %}active{% endif %}"
-        title="{% if report.id in fav_ids %}Remover dos favoritos{% else %}Adicionar aos favoritos{% endif %}"
-        onclick="toggleFav(event, {{ report.id }}, this)">
-        {% if report.id in fav_ids %}★{% else %}☆{% endif %}
-      </button>
-      <div class="pp-report-card-icon">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <rect x="3" y="11" width="3" height="7" rx="1" fill="#00A8CC"/>
-          <rect x="8.5" y="7" width="3" height="11" rx="1" fill="#1B4F8A"/>
-          <rect x="14" y="3" width="3" height="15" rx="1" fill="#0D1B2A"/>
-        </svg>
-      </div>
-      <div class="pp-report-card-name">{{ report.name }}</div>
-      {% if report.description %}
-      <div class="pp-report-card-desc">{{ report.description }}</div>
-      {% endif %}
-    </a>
-    {% endfor %}
+  <div class="group-section" id="section-loose" data-section="__loose__">
+    {% if groups_data or fav_reports %}
+    <div class="pp-section-label" style="margin-top:8px">Outros relatórios</div>
+    {% endif %}
+    <div class="pp-report-grid" id="grid-loose">
+      {% for report in loose_reports %}
+      <a href="/report/{{ report.id }}"
+         class="pp-report-card {% if report.id in fav_ids %}is-favorite{% endif %}"
+         data-report-id="{{ report.id }}"
+         data-name="{{ report.name | lower }}"
+         data-section="__loose__">
+        <button class="fav-btn {% if report.id in fav_ids %}active{% endif %}"
+          title="{% if report.id in fav_ids %}Remover dos favoritos{% else %}Adicionar aos favoritos{% endif %}"
+          onclick="toggleFav(event, {{ report.id }}, this)">
+          {% if report.id in fav_ids %}★{% else %}☆{% endif %}
+        </button>
+        <div class="pp-report-card-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="3" y="11" width="3" height="7" rx="1" fill="#00A8CC"/>
+            <rect x="8.5" y="7" width="3" height="11" rx="1" fill="#1B4F8A"/>
+            <rect x="14" y="3" width="3" height="15" rx="1" fill="#0D1B2A"/>
+          </svg>
+        </div>
+        <div class="pp-report-card-name">{{ report.name }}</div>
+        {% if report.description %}
+        <div class="pp-report-card-desc">{{ report.description }}</div>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
   </div>
   {% endif %}
+
+  <!-- Empty state busca -->
+  <div class="search-empty" id="search-empty">
+    <div class="search-empty-icon">🔍</div>
+    <p>Nenhum relatório encontrado para "<strong id="search-empty-term"></strong>"</p>
+  </div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 
 {% block extra_script %}
 <script>
-  // Toggle favorito
+  // ── Busca e filtro ───────────────────────────────────────────
+
+  function applyFilters() {
+    var q        = document.getElementById('search-input').value.toLowerCase().trim();
+    var section  = document.getElementById('group-filter').value;
+    var cards    = document.querySelectorAll('.pp-report-card');
+    var clearBtn = document.getElementById('search-clear');
+    var btnClear = document.getElementById('btn-clear-filters');
+    var hasFilter = q || section;
+    var total    = 0;
+
+    clearBtn.style.display = q ? 'block' : 'none';
+    btnClear.style.display = hasFilter ? 'inline-flex' : 'none';
+
+    cards.forEach(function(card) {
+      var name         = card.dataset.name || '';
+      var cardSection  = card.dataset.section || '';
+      var matchQuery   = !q || name.includes(q);
+      var matchSection = !section || cardSection === section;
+      var visible      = matchQuery && matchSection;
+
+      card.classList.toggle('hidden', !visible);
+
+      var nameEl = card.querySelector('.pp-report-card-name');
+      if (nameEl) {
+        var original = nameEl.textContent.replace(/<[^>]+>/g, '');
+        if (q && matchQuery) {
+          var re = new RegExp('(' + escapeRegex(q) + ')', 'gi');
+          nameEl.innerHTML = original.replace(re, '<span class="search-highlight">$1</span>');
+        } else {
+          nameEl.textContent = original;
+        }
+      }
+
+      if (visible) total++;
+    });
+
+    document.querySelectorAll('.group-section').forEach(function(sec) {
+      var sectionId    = sec.dataset.section;
+      var sectionMatch = !section || sectionId === section;
+      var hasVisible   = sec.querySelectorAll('.pp-report-card:not(.hidden)').length > 0;
+      sec.classList.toggle('hidden', !sectionMatch || !hasVisible);
+    });
+
+    var countEl = document.getElementById('results-count');
+    countEl.innerHTML = hasFilter ? '<strong>' + total + '</strong> resultado(s)' : '';
+
+    var emptyEl = document.getElementById('search-empty');
+    var termEl  = document.getElementById('search-empty-term');
+    if (total === 0 && q) {
+      emptyEl.classList.add('visible');
+      if (termEl) termEl.textContent = q;
+    } else {
+      emptyEl.classList.remove('visible');
+    }
+  }
+
+  function clearSearch() {
+    document.getElementById('search-input').value  = '';
+    document.getElementById('group-filter').value  = '';
+    document.getElementById('search-clear').style.display     = 'none';
+    document.getElementById('btn-clear-filters').style.display = 'none';
+    applyFilters();
+  }
+
+    // Esconde seções vazias
+    document.querySelectorAll('.group-section').forEach(function(sec) {
+      var sectionId = sec.dataset.section;
+      var sectionMatch = !section || sectionId === section;
+      var hasVisible = sec.querySelectorAll('.pp-report-card:not(.hidden)').length > 0;
+      sec.classList.toggle('hidden', !sectionMatch || !hasVisible);
+    });
+
+    // Atualiza contador
+    var countEl = document.getElementById('results-count');
+    if (q || section) {
+      countEl.innerHTML = '<strong>' + total + '</strong> resultado(s)';
+    } else {
+      countEl.innerHTML = '';
+    }
+
+    // Empty state
+    var emptyEl = document.getElementById('search-empty');
+    var termEl  = document.getElementById('search-empty-term');
+    if (total === 0 && q) {
+      emptyEl.classList.add('visible');
+      if (termEl) termEl.textContent = q;
+    } else {
+      emptyEl.classList.remove('visible');
+    }
+  }
+
+  function clearSearch() {
+    document.getElementById('search-input').value = '';
+    document.getElementById('group-filter').value = '';
+    document.getElementById('search-clear').style.display = 'none';
+    applyFilters();
+  }
+
+  function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  // ── Favoritos ────────────────────────────────────────────────
+
   async function toggleFav(e, reportId, btn) {
     e.preventDefault();
     e.stopPropagation();
     btn.classList.add('loading');
-
-    var res  = await fetch('/favorites/toggle/' + reportId, { method: 'POST' });
-    var data = await res.json();
-
-    // Recarrega o dashboard para atualizar a seção de favoritos
+    await fetch('/favorites/toggle/' + reportId, { method: 'POST' });
     window.location.reload();
   }
 
-  // Drag and drop para reordenar favoritos
+  // ── Drag and drop favoritos ──────────────────────────────────
+
   var favGrid = document.getElementById('fav-grid');
   if (favGrid) {
     Sortable.create(favGrid, {
       animation: 150,
-      ghostClass: 'sortable-ghost',
+      ghostClass:  'sortable-ghost',
       chosenClass: 'sortable-chosen',
+      filter: '.fav-btn',
       onEnd: function() {
         var ids = Array.from(favGrid.querySelectorAll('.pp-report-card'))
           .map(function(el) { return parseInt(el.dataset.reportId); });
-
         fetch('/favorites/reorder', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
