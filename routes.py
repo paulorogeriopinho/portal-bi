@@ -15,7 +15,8 @@ def init_routes(app, db, mail,
                 User, Report, ReportRLS, Group, ReportGroup,
                 Permission, RolePermission, AccessLog,
                 PasswordResetCode, PortalSettings,
-                RoleModulePermission, UserModulePermission, Role):
+                RoleModulePermission, UserModulePermission,
+                Role, UserFavorite):
     
     # ── Helpers ──────────────────────────────────────────────────
 
@@ -50,21 +51,18 @@ def init_routes(app, db, mail,
         return decorator
     
     def get_user_reports(user):
-        """Retorna (groups_data, loose_reports) considerando role + permissões extras."""
         if user.is_admin:
-            groups  = Group.query.filter_by(active=True).order_by(Group.name).all()
+            groups = Group.query.filter_by(active=True).order_by(Group.name).all()
             all_grouped_ids = [rg.report_id for rg in ReportGroup.query.all()]
             loose = Report.query.filter_by(active=True).filter(
                 ~Report.id.in_(all_grouped_ids) if all_grouped_ids else True
             ).all()
         else:
-            # Grupos via ROLE
             role_group_ids = [
                 rp.group_id for rp in
                 RolePermission.query.filter_by(role=user.role, report_id=None).all()
                 if rp.group_id
             ]
-            # Grupos via permissão INDIVIDUAL
             user_group_ids = [
                 p.group_id for p in
                 Permission.query.filter_by(user_id=user.id, report_id=None).all()
@@ -75,13 +73,11 @@ def init_routes(app, db, mail,
                 Group.id.in_(all_group_ids), Group.active == True
             ).order_by(Group.name).all() if all_group_ids else []
 
-            # Relatórios avulsos via ROLE
             role_report_ids = [
                 rp.report_id for rp in
                 RolePermission.query.filter_by(role=user.role, group_id=None).all()
                 if rp.report_id
             ]
-            # Relatórios avulsos via permissão INDIVIDUAL
             user_report_ids = [
                 p.report_id for p in
                 Permission.query.filter_by(user_id=user.id, group_id=None).all()
@@ -89,7 +85,6 @@ def init_routes(app, db, mail,
             ]
             all_report_ids = list(set(role_report_ids + user_report_ids))
 
-            # Remove os que já aparecem em grupos
             grouped_ids = [
                 rg.report_id for rg in
                 ReportGroup.query.filter(ReportGroup.group_id.in_(all_group_ids)).all()
@@ -98,6 +93,26 @@ def init_routes(app, db, mail,
             loose = Report.query.filter(
                 Report.id.in_(loose_ids), Report.active == True
             ).all() if loose_ids else []
+
+        # Favoritos ordenados por position
+        favs = UserFavorite.query.filter_by(user_id=user.id)\
+            .order_by(UserFavorite.position).all()
+        fav_ids = [f.report_id for f in favs]
+
+        # Coleta todos os report_ids que o usuário pode ver
+        all_visible = set()
+        all_visible.update(r.id for r in loose)
+        for g in groups:
+            rg_ids = [rg.report_id for rg in ReportGroup.query.filter_by(group_id=g.id).all()]
+            all_visible.update(rg_ids)
+
+        # Favoritos que o usuário ainda tem acesso
+        fav_reports = []
+        for fid in fav_ids:
+            if fid in all_visible or user.is_admin:
+                r = Report.query.filter_by(id=fid, active=True).first()
+                if r:
+                    fav_reports.append(r)
 
         groups_data = []
         for g in groups:
@@ -108,7 +123,7 @@ def init_routes(app, db, mail,
             if reports:
                 groups_data.append({"group": g, "reports": reports})
 
-        return groups_data, loose
+        return groups_data, loose, fav_reports, fav_ids
 
     def can_access_report(user, report_id):
         """Verifica se usuário pode acessar um relatório."""
@@ -195,11 +210,13 @@ def init_routes(app, db, mail,
     def dashboard():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
-        groups_data, loose_reports = get_user_reports(user)
+        groups_data, loose_reports, fav_reports, fav_ids = get_user_reports(user)
         return render_template("dashboard.html",
                                user=user,
                                groups_data=groups_data,
-                               loose_reports=loose_reports)
+                               loose_reports=loose_reports,
+                               fav_reports=fav_reports,
+                               fav_ids=fav_ids)
 
     @app.route("/report/<int:report_id>")
     @jwt_required()
@@ -932,3 +949,41 @@ def init_routes(app, db, mail,
 
         settings = {s.key: s.value for s in PortalSettings.query.all()}
         return render_template("admin_settings.html", user=user, settings=settings)
+    
+    # ── Favoritos ─────────────────────────────────────────────────
+
+    @app.route("/favorites/toggle/<int:report_id>", methods=["POST"])
+    @jwt_required()
+    def toggle_favorite(report_id):
+        user_id = int(get_jwt_identity())
+        fav = UserFavorite.query.filter_by(
+            user_id=user_id, report_id=report_id
+        ).first()
+        if fav:
+            db.session.delete(fav)
+            db.session.commit()
+            return jsonify({"status": "removed"})
+        # Nova posição = último da lista
+        max_pos = db.session.query(db.func.max(UserFavorite.position))\
+            .filter_by(user_id=user_id).scalar() or 0
+        new_fav = UserFavorite(
+            user_id=user_id, report_id=report_id, position=max_pos + 1
+        )
+        db.session.add(new_fav)
+        db.session.commit()
+        return jsonify({"status": "added"})
+
+    @app.route("/favorites/reorder", methods=["POST"])
+    @jwt_required()
+    def reorder_favorites():
+        user_id = int(get_jwt_identity())
+        data    = request.json
+        ids     = data.get("ids", [])
+        for i, rid in enumerate(ids):
+            fav = UserFavorite.query.filter_by(
+                user_id=user_id, report_id=rid
+            ).first()
+            if fav:
+                fav.position = i
+        db.session.commit()
+        return jsonify({"status": "ok"})

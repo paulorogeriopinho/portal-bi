@@ -8,21 +8,39 @@
   .pp-welcome { margin-bottom: 28px; }
   .pp-welcome h1 { font-size: 22px; font-weight: 700; color: var(--pp-navy); }
   .pp-welcome p  { font-size: 13px; color: var(--pp-gray500); margin-top: 5px; }
+
   .pp-section-label {
     display: flex; align-items: center; gap: 10px;
     font-size: 11px; font-weight: 700; color: var(--pp-gray500);
     text-transform: uppercase; letter-spacing: 0.5px;
     margin-bottom: 14px;
   }
-  .pp-section-label::after { content: ''; flex: 1; height: 1px; background: var(--pp-gray100); }
-  .pp-report-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-bottom: 32px; }
+  .pp-section-label::after { content:''; flex:1; height:1px; background:var(--pp-gray100); }
+
+  .pp-report-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px; margin-bottom: 32px;
+  }
+
+  /* Card base */
   .pp-report-card {
     background: #fff; border-radius: 10px; padding: 20px;
     border: 1px solid var(--pp-gray100); text-decoration: none; color: inherit;
-    transition: all 0.15s; display: block;
+    transition: all 0.15s; display: block; position: relative;
     box-shadow: 0 1px 3px rgba(13,27,42,0.04);
   }
-  .pp-report-card:hover { border-color: var(--pp-accent); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(13,27,42,0.08); }
+  .pp-report-card:hover {
+    border-color: var(--pp-accent);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(13,27,42,0.08);
+  }
+
+  /* Card favorito — borda superior colorida */
+  .pp-report-card.is-favorite {
+    border-top: 3px solid var(--pp-accent);
+  }
+
   .pp-report-card-icon {
     width: 38px; height: 38px; border-radius: 9px;
     display: flex; align-items: center; justify-content: center;
@@ -31,10 +49,49 @@
   }
   .pp-report-card-name { font-size: 14px; font-weight: 600; color: var(--pp-navy); margin-bottom: 4px; }
   .pp-report-card-desc { font-size: 12px; color: var(--pp-gray500); line-height: 1.5; }
+
+  /* Botão de favorito */
+  .fav-btn {
+    position: absolute; top: 12px; right: 12px;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: none; background: transparent; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; transition: all 0.15s; z-index: 2;
+    color: var(--pp-gray300);
+  }
+  .fav-btn:hover { background: var(--pp-ice); color: var(--pp-accent); transform: scale(1.15); }
+  .fav-btn.active { color: #F59E0B; }
+  .fav-btn.loading { opacity: 0.5; pointer-events: none; }
+
+  /* Seção favoritos */
+  .fav-section { margin-bottom: 32px; }
+  .fav-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px;
+  }
+  .fav-title {
+    font-size: 11px; font-weight: 700; color: var(--pp-gray500);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .fav-title::after { content:''; flex:1; height:1px; background:var(--pp-gray100); }
+  .fav-count {
+    font-size: 11px; font-weight: 600; background: #FEF3C7;
+    color: #92400E; padding: 2px 8px; border-radius: 10px;
+  }
+  .fav-hint {
+    font-size: 11px; color: var(--pp-gray300);
+    margin-bottom: 12px; font-style: italic;
+  }
+
+  /* Drag and drop */
+  .pp-report-grid.sortable-active .pp-report-card { cursor: grab; }
+  .pp-report-card.sortable-ghost { opacity: 0.4; border: 2px dashed var(--pp-accent); }
+  .pp-report-card.sortable-chosen { box-shadow: 0 8px 24px rgba(13,27,42,0.15); transform: scale(1.02); }
+
   .pp-group-icon {
     width: 22px; height: 22px; background: var(--pp-ice);
-    border-radius: 5px; display: inline-flex; align-items: center;
-    justify-content: center;
+    border-radius: 5px; display: inline-flex; align-items: center; justify-content: center;
   }
 </style>
 {% endblock %}
@@ -44,19 +101,47 @@
 <div class="pp-container">
   <div class="pp-welcome">
     <h1>Olá, {{ user.name.split()[0] }}</h1>
-    <p>
-      {% set weekdays = ['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'] %}
-      {% set months = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'] %}
-      Bem-vindo ao portal de Business Intelligence
-      {% if client %} · {{ client.company_name }}{% endif %}
-    </p>
+    <p>Bem-vindo ao portal de Business Intelligence{% if portal.company_name %} · {{ portal.company_name }}{% endif %}</p>
   </div>
 
-  {% if not groups_data and not loose_reports %}
+  {% if not groups_data and not loose_reports and not fav_reports %}
   <div class="pp-card" style="padding:60px;text-align:center">
     <div style="font-size:40px;margin-bottom:12px">📋</div>
     <div style="font-size:15px;font-weight:600;color:var(--pp-navy);margin-bottom:6px">Nenhum relatório disponível</div>
     <div style="font-size:13px;color:var(--pp-gray500)">Aguarde a liberação de acesso pelo administrador.</div>
+  </div>
+  {% endif %}
+
+  {% if fav_reports %}
+  <div class="fav-section">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <div class="fav-title" style="flex:1">
+        ⭐ Favoritos
+      </div>
+      <span class="fav-count">{{ fav_reports|length }}</span>
+      <div style="flex:1;height:1px;background:var(--pp-gray100)"></div>
+    </div>
+    <div class="fav-hint">Arraste os cards para reordenar seus favoritos.</div>
+    <div class="pp-report-grid sortable-active" id="fav-grid">
+      {% for report in fav_reports %}
+      <a href="/report/{{ report.id }}" class="pp-report-card is-favorite"
+         data-report-id="{{ report.id }}">
+        <button class="fav-btn active" title="Remover dos favoritos"
+          onclick="toggleFav(event, {{ report.id }}, this)">★</button>
+        <div class="pp-report-card-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="3" y="11" width="3" height="7" rx="1" fill="#00A8CC"/>
+            <rect x="8.5" y="7" width="3" height="11" rx="1" fill="#1B4F8A"/>
+            <rect x="14" y="3" width="3" height="15" rx="1" fill="#0D1B2A"/>
+          </svg>
+        </div>
+        <div class="pp-report-card-name">{{ report.name }}</div>
+        {% if report.description %}
+        <div class="pp-report-card-desc">{{ report.description }}</div>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
   </div>
   {% endif %}
 
@@ -77,7 +162,12 @@
   {% endif %}
   <div class="pp-report-grid">
     {% for report in item.reports %}
-    <a href="/report/{{ report.id }}" class="pp-report-card">
+    <a href="/report/{{ report.id }}" class="pp-report-card {% if report.id in fav_ids %}is-favorite{% endif %}">
+      <button class="fav-btn {% if report.id in fav_ids %}active{% endif %}"
+        title="{% if report.id in fav_ids %}Remover dos favoritos{% else %}Adicionar aos favoritos{% endif %}"
+        onclick="toggleFav(event, {{ report.id }}, this)">
+        {% if report.id in fav_ids %}★{% else %}☆{% endif %}
+      </button>
       <div class="pp-report-card-icon">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <rect x="3" y="11" width="3" height="7" rx="1" fill="#00A8CC"/>
@@ -95,12 +185,17 @@
   {% endfor %}
 
   {% if loose_reports %}
-  {% if groups_data %}
+  {% if groups_data or fav_reports %}
   <div class="pp-section-label" style="margin-top:8px">Outros relatórios</div>
   {% endif %}
   <div class="pp-report-grid">
     {% for report in loose_reports %}
-    <a href="/report/{{ report.id }}" class="pp-report-card">
+    <a href="/report/{{ report.id }}" class="pp-report-card {% if report.id in fav_ids %}is-favorite{% endif %}">
+      <button class="fav-btn {% if report.id in fav_ids %}active{% endif %}"
+        title="{% if report.id in fav_ids %}Remover dos favoritos{% else %}Adicionar aos favoritos{% endif %}"
+        onclick="toggleFav(event, {{ report.id }}, this)">
+        {% if report.id in fav_ids %}★{% else %}☆{% endif %}
+      </button>
       <div class="pp-report-card-icon">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <rect x="3" y="11" width="3" height="7" rx="1" fill="#00A8CC"/>
@@ -117,4 +212,43 @@
   </div>
   {% endif %}
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+
+{% block extra_script %}
+<script>
+  // Toggle favorito
+  async function toggleFav(e, reportId, btn) {
+    e.preventDefault();
+    e.stopPropagation();
+    btn.classList.add('loading');
+
+    var res  = await fetch('/favorites/toggle/' + reportId, { method: 'POST' });
+    var data = await res.json();
+
+    // Recarrega o dashboard para atualizar a seção de favoritos
+    window.location.reload();
+  }
+
+  // Drag and drop para reordenar favoritos
+  var favGrid = document.getElementById('fav-grid');
+  if (favGrid) {
+    Sortable.create(favGrid, {
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onEnd: function() {
+        var ids = Array.from(favGrid.querySelectorAll('.pp-report-card'))
+          .map(function(el) { return parseInt(el.dataset.reportId); });
+
+        fetch('/favorites/reorder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: ids })
+        });
+      }
+    });
+  }
+</script>
+{% endblock %}
 {% endblock %}

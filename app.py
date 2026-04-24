@@ -41,7 +41,8 @@ from models import init_models, create_tables
 (User, Report, ReportRLS, Group, ReportGroup,
  Permission, RolePermission, AccessLog,
  PasswordResetCode, PortalSettings,
- RoleModulePermission, UserModulePermission, Role) = init_models(db)
+ RoleModulePermission, UserModulePermission,
+ Role, UserFavorite) = init_models(db)
 
 @app.template_filter('user_count')
 def user_count_filter(role_key):
@@ -113,7 +114,8 @@ init_routes(app, db, mail,
             User, Report, ReportRLS, Group, ReportGroup,
             Permission, RolePermission, AccessLog,
             PasswordResetCode, PortalSettings,
-            RoleModulePermission, UserModulePermission, Role)
+            RoleModulePermission, UserModulePermission,
+            Role, UserFavorite)
 
 if __name__ == "__main__":
     with app.app_context():

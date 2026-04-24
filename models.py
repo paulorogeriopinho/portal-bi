@@ -118,10 +118,20 @@ def init_models(db):
         active      = db.Column(db.Boolean, default=True)
         created_at  = db.Column(db.DateTime, default=datetime.utcnow)
 
+    class UserFavorite(db.Model):
+        __tablename__ = "user_favorites"
+        id         = db.Column(db.Integer, primary_key=True)
+        user_id    = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+        report_id  = db.Column(db.Integer, db.ForeignKey("reports.id", ondelete="CASCADE"), nullable=False)
+        position   = db.Column(db.Integer, default=0)
+        created_at = db.Column(db.DateTime, default=datetime.utcnow)
+        __table_args__ = (db.UniqueConstraint("user_id", "report_id"),)
+
     return (User, Report, ReportRLS, Group, ReportGroup,
             Permission, RolePermission, AccessLog,
             PasswordResetCode, PortalSettings,
-            RoleModulePermission, UserModulePermission, Role)
+            RoleModulePermission, UserModulePermission,
+            Role, UserFavorite)
 
 def create_tables(db):
     db.create_all()
