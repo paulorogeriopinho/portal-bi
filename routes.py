@@ -224,19 +224,35 @@ def init_routes(app, db, mail,
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
         report  = Report.query.get_or_404(report_id)
+
         if not can_access_report(user, report_id):
             return redirect(url_for("dashboard"))
-        log = AccessLog(user_id=user_id, report_id=report_id,
-                        ip_address=request.remote_addr,
-                        accessed_at=datetime.utcnow())
+
+        log = AccessLog(
+            user_id=user_id, report_id=report_id,
+            ip_address=request.remote_addr,
+            accessed_at=datetime.utcnow()
+        )
         db.session.add(log)
         db.session.commit()
+
         rls_configs = ReportRLS.query.filter_by(report_id=report_id).all()
         embed_data  = get_embed_token(
             report.workspace_id, report.report_id,
             user=user, has_rls=report.has_rls, rls_configs=rls_configs
         )
-        return render_template("report.html", user=user, report=report, embed=embed_data)
+
+        # Dados para a sidebar
+        groups_data, loose_reports, fav_reports, fav_ids = get_user_reports(user)
+
+        return render_template("report.html",
+                               user=user,
+                               report=report,
+                               embed=embed_data,
+                               groups_data=groups_data,
+                               loose_reports=loose_reports,
+                               fav_reports=fav_reports,
+                               fav_ids=fav_ids)
 
     # ── Admin Users ───────────────────────────────────────────────
 

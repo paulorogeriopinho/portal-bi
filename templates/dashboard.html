@@ -178,11 +178,6 @@
       {% endif %}
     </select>
 
-    <button class="pp-btn pp-btn-outline pp-btn-sm" id="btn-clear-filters"
-      onclick="clearSearch()" style="display:none;white-space:nowrap">
-      ✕ Limpar filtros
-    </button>
-
     <span class="search-results-count" id="results-count"></span>
   </div>
   {% endif %}
@@ -329,67 +324,37 @@
   // ── Busca e filtro ───────────────────────────────────────────
 
   function applyFilters() {
-    var q        = document.getElementById('search-input').value.toLowerCase().trim();
-    var section  = document.getElementById('group-filter').value;
-    var cards    = document.querySelectorAll('.pp-report-card');
+    var q       = document.getElementById('search-input').value.toLowerCase().trim();
+    var section = document.getElementById('group-filter').value;
+    var cards   = document.querySelectorAll('.pp-report-card');
     var clearBtn = document.getElementById('search-clear');
-    var btnClear = document.getElementById('btn-clear-filters');
-    var hasFilter = q || section;
-    var total    = 0;
+    var total   = 0;
 
     clearBtn.style.display = q ? 'block' : 'none';
-    btnClear.style.display = hasFilter ? 'inline-flex' : 'none';
 
     cards.forEach(function(card) {
-      var name         = card.dataset.name || '';
-      var cardSection  = card.dataset.section || '';
-      var matchQuery   = !q || name.includes(q);
+      var name        = card.dataset.name || '';
+      var cardSection = card.dataset.section || '';
+      var matchQuery  = !q || name.includes(q);
       var matchSection = !section || cardSection === section;
-      var visible      = matchQuery && matchSection;
+      var visible     = matchQuery && matchSection;
 
       card.classList.toggle('hidden', !visible);
 
+      // Highlight do texto buscado
       var nameEl = card.querySelector('.pp-report-card-name');
       if (nameEl) {
-        var original = nameEl.textContent.replace(/<[^>]+>/g, '');
+        var original = nameEl.textContent;
         if (q && matchQuery) {
           var re = new RegExp('(' + escapeRegex(q) + ')', 'gi');
           nameEl.innerHTML = original.replace(re, '<span class="search-highlight">$1</span>');
         } else {
-          nameEl.textContent = original;
+          nameEl.textContent = original.replace(/<[^>]+>/g, '');
         }
       }
 
       if (visible) total++;
     });
-
-    document.querySelectorAll('.group-section').forEach(function(sec) {
-      var sectionId    = sec.dataset.section;
-      var sectionMatch = !section || sectionId === section;
-      var hasVisible   = sec.querySelectorAll('.pp-report-card:not(.hidden)').length > 0;
-      sec.classList.toggle('hidden', !sectionMatch || !hasVisible);
-    });
-
-    var countEl = document.getElementById('results-count');
-    countEl.innerHTML = hasFilter ? '<strong>' + total + '</strong> resultado(s)' : '';
-
-    var emptyEl = document.getElementById('search-empty');
-    var termEl  = document.getElementById('search-empty-term');
-    if (total === 0 && q) {
-      emptyEl.classList.add('visible');
-      if (termEl) termEl.textContent = q;
-    } else {
-      emptyEl.classList.remove('visible');
-    }
-  }
-
-  function clearSearch() {
-    document.getElementById('search-input').value  = '';
-    document.getElementById('group-filter').value  = '';
-    document.getElementById('search-clear').style.display     = 'none';
-    document.getElementById('btn-clear-filters').style.display = 'none';
-    applyFilters();
-  }
 
     // Esconde seções vazias
     document.querySelectorAll('.group-section').forEach(function(sec) {
