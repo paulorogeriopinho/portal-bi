@@ -728,14 +728,65 @@ def init_routes(app, db, mail,
     def admin_logs():
         user_id = int(get_jwt_identity())
         user    = User.query.get(user_id)
-        if not user.is_admin and "logs" not in get_user_modules(user):
+        if not check_module_access(user, "logs"):
             return redirect(url_for("dashboard"))
-        logs = db.session.query(AccessLog, User, Report)\
-            .join(User,   AccessLog.user_id   == User.id)\
-            .join(Report, AccessLog.report_id == Report.id)\
-            .order_by(AccessLog.accessed_at.desc()).limit(200).all()
-        return render_template("admin_logs.html", user=user, logs=logs)
 
+        from datetime import datetime, timedelta
+
+        f_q       = request.args.get("q",         "").strip()
+        f_user    = request.args.get("user_id",   "").strip()
+        f_role    = request.args.get("role",       "").strip()
+        f_report  = request.args.get("report_id", "").strip()
+        f_date_from = request.args.get("date_from","").strip()
+        f_date_to   = request.args.get("date_to",  "").strip()
+
+        query = db.session.query(AccessLog, User, Report)\
+            .join(User,   AccessLog.user_id   == User.id)\
+            .join(Report, AccessLog.report_id == Report.id)
+
+        if f_user:
+            query = query.filter(AccessLog.user_id == int(f_user))
+        if f_role:
+            query = query.filter(User.role == f_role)
+        if f_report:
+            query = query.filter(AccessLog.report_id == int(f_report))
+        if f_q:
+            query = query.filter(
+                db.or_(
+                    User.name.ilike(f"%{f_q}%"),
+                    Report.name.ilike(f"%{f_q}%")
+                )
+            )
+        if f_date_from:
+            try:
+                query = query.filter(
+                    AccessLog.accessed_at >= datetime.strptime(f_date_from, "%Y-%m-%d")
+                )
+            except Exception:
+                pass
+        if f_date_to:
+            try:
+                dt_to = datetime.strptime(f_date_to, "%Y-%m-%d") + timedelta(days=1)
+                query = query.filter(AccessLog.accessed_at < dt_to)
+            except Exception:
+                pass
+
+        logs = query.order_by(AccessLog.accessed_at.desc()).limit(500).all()
+
+        all_users   = User.query.filter_by(active=True).order_by(User.name).all()
+        all_reports = Report.query.filter_by(active=True).order_by(Report.name).all()
+        all_roles   = Role.query.filter_by(active=True).order_by(Role.label).all()
+
+        return render_template("admin_logs.html",
+            user=user, logs=logs,
+            all_users=all_users,
+            all_reports=all_reports,
+            all_roles=all_roles,
+            f_q=f_q, f_user=f_user,
+            f_role=f_role, f_report=f_report,
+            f_date_from=f_date_from, f_date_to=f_date_to,
+        )
+    
     # ── Recuperação de senha ──────────────────────────────────────
 
     def gerar_codigo():
@@ -1017,125 +1068,162 @@ def init_routes(app, db, mail,
         from sqlalchemy import func, cast, Date
         from datetime import datetime, timedelta
 
-        hoje   = datetime.utcnow().date()
-        semana = hoje - timedelta(days=7)
-        mes    = hoje - timedelta(days=30)
+        # ── Filtros do topo ──────────────────────────────────────
+        f_days    = int(request.args.get("days",    30))
+        f_user    = request.args.get("user_id",  "").strip()
+        f_role    = request.args.get("role",     "").strip()
+        f_report  = request.args.get("report_id","").strip()
+
+        # Limita opções de período
+        if f_days not in [7, 15, 30, 60, 90]:
+            f_days = 30
+
+        hoje      = datetime.utcnow().date()
+        data_ini  = hoje - timedelta(days=f_days)
+
+        # Query base com filtros
+        base_q = AccessLog.query.filter(AccessLog.accessed_at >= data_ini)
+        if f_user:
+            base_q = base_q.filter(AccessLog.user_id == int(f_user))
+        if f_report:
+            base_q = base_q.filter(AccessLog.report_id == int(f_report))
+        if f_role:
+            user_ids_role = [u.id for u in User.query.filter_by(role=f_role).all()]
+            base_q = base_q.filter(AccessLog.user_id.in_(user_ids_role))
 
         # ── Cards de resumo ──────────────────────────────────────
-        total_hoje   = AccessLog.query.filter(
+        total_periodo = base_q.count()
+        total_hoje    = AccessLog.query.filter(
             cast(AccessLog.accessed_at, Date) == hoje).count()
-        total_semana = AccessLog.query.filter(
-            AccessLog.accessed_at >= semana).count()
-        total_mes    = AccessLog.query.filter(
-            AccessLog.accessed_at >= mes).count()
+        total_semana  = AccessLog.query.filter(
+            AccessLog.accessed_at >= hoje - timedelta(days=7)).count()
         usuarios_ativos = db.session.query(
             func.count(func.distinct(AccessLog.user_id))
-        ).filter(AccessLog.accessed_at >= mes).scalar()
+        ).filter(AccessLog.accessed_at >= data_ini).scalar()
 
-        # ── Acessos por dia (últimos 30 dias) ────────────────────
+        # ── Acessos por dia ──────────────────────────────────────
         acessos_dia_raw = db.session.query(
             cast(AccessLog.accessed_at, Date).label('dia'),
             func.count().label('total')
-        ).filter(
-            AccessLog.accessed_at >= mes
-        ).group_by(
+        ).filter(AccessLog.accessed_at >= data_ini)
+        if f_user:
+            acessos_dia_raw = acessos_dia_raw.filter(AccessLog.user_id == int(f_user))
+        if f_report:
+            acessos_dia_raw = acessos_dia_raw.filter(AccessLog.report_id == int(f_report))
+        if f_role:
+            acessos_dia_raw = acessos_dia_raw.filter(AccessLog.user_id.in_(user_ids_role))
+        acessos_dia_raw = acessos_dia_raw.group_by(
             cast(AccessLog.accessed_at, Date)
         ).order_by('dia').all()
 
-        # Preenche dias sem acesso com 0
-        dias_map = {str(r.dia): r.total for r in acessos_dia_raw}
+        dias_map   = {str(r.dia): r.total for r in acessos_dia_raw}
         acessos_dia = []
-        for i in range(30):
-            d = str(mes + timedelta(days=i))
+        for i in range(f_days):
+            d = str(data_ini + timedelta(days=i))
             acessos_dia.append({"dia": d, "total": dias_map.get(d, 0)})
 
-        # ── Top relatórios (top 10) ──────────────────────────────
-        top_reports_raw = db.session.query(
+        # ── Top relatórios ───────────────────────────────────────
+        top_q = db.session.query(
+            Report.id,
             Report.name,
             func.count(AccessLog.id).label('total')
-        ).join(
-            AccessLog, AccessLog.report_id == Report.id
-        ).filter(
-            AccessLog.accessed_at >= mes
-        ).group_by(Report.name).order_by(
-            func.count(AccessLog.id).desc()
-        ).limit(10).all()
+        ).join(AccessLog, AccessLog.report_id == Report.id
+        ).filter(AccessLog.accessed_at >= data_ini)
+        if f_user:
+            top_q = top_q.filter(AccessLog.user_id == int(f_user))
+        if f_report:
+            top_q = top_q.filter(AccessLog.report_id == int(f_report))
+        if f_role:
+            top_q = top_q.filter(AccessLog.user_id.in_(user_ids_role))
+        top_reports = [
+            {"id": r.id, "name": r.name, "total": r.total}
+            for r in top_q.group_by(Report.id, Report.name
+            ).order_by(func.count(AccessLog.id).desc()).limit(10).all()
+        ]
 
-        top_reports = [{"name": r.name, "total": r.total} for r in top_reports_raw]
-
-        # ── Usuários mais ativos (top 10) ────────────────────────
-        top_users_raw = db.session.query(
+        # ── Top usuários ─────────────────────────────────────────
+        top_u_q = db.session.query(
+            User.id,
             User.name,
             User.role,
             func.count(AccessLog.id).label('total')
-        ).join(
-            AccessLog, AccessLog.user_id == User.id
-        ).filter(
-            AccessLog.accessed_at >= mes
-        ).group_by(User.name, User.role).order_by(
-            func.count(AccessLog.id).desc()
-        ).limit(10).all()
-
+        ).join(AccessLog, AccessLog.user_id == User.id
+        ).filter(AccessLog.accessed_at >= data_ini)
+        if f_user:
+            top_u_q = top_u_q.filter(AccessLog.user_id == int(f_user))
+        if f_report:
+            top_u_q = top_u_q.filter(AccessLog.report_id == int(f_report))
+        if f_role:
+            top_u_q = top_u_q.filter(AccessLog.user_id.in_(user_ids_role))
         top_users = [
-            {"name": u.name, "role": u.role, "total": u.total}
-            for u in top_users_raw
+            {"id": u.id, "name": u.name, "role": u.role, "total": u.total}
+            for u in top_u_q.group_by(User.id, User.name, User.role
+            ).order_by(func.count(AccessLog.id).desc()).limit(10).all()
         ]
 
-        # ── Acessos por hora do dia ──────────────────────────────
-        acessos_hora_raw = db.session.query(
+        # ── Acessos por hora ─────────────────────────────────────
+        hora_q = db.session.query(
             func.extract('hour', AccessLog.accessed_at).label('hora'),
             func.count().label('total')
-        ).filter(
-            AccessLog.accessed_at >= mes
-        ).group_by('hora').order_by('hora').all()
-
-        horas_map = {int(r.hora): r.total for r in acessos_hora_raw}
+        ).filter(AccessLog.accessed_at >= data_ini)
+        if f_user:
+            hora_q = hora_q.filter(AccessLog.user_id == int(f_user))
+        if f_report:
+            hora_q = hora_q.filter(AccessLog.report_id == int(f_report))
+        if f_role:
+            hora_q = hora_q.filter(AccessLog.user_id.in_(user_ids_role))
+        horas_map = {int(r.hora): r.total for r in hora_q.group_by('hora').all()}
         acessos_hora = [
             {"hora": f"{h:02d}h", "total": horas_map.get(h, 0)}
             for h in range(24)
         ]
 
         # ── Acessos por dia da semana ────────────────────────────
-        dias_semana_names = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo']
-        acessos_semana_raw = db.session.query(
+        sem_q = db.session.query(
             func.extract('dow', AccessLog.accessed_at).label('dow'),
             func.count().label('total')
-        ).filter(
-            AccessLog.accessed_at >= mes
-        ).group_by('dow').all()
-
-        # PostgreSQL: dow 0=domingo, 1=segunda... ajusta para seg=0
-        dow_map = {int(r.dow): r.total for r in acessos_semana_raw}
+        ).filter(AccessLog.accessed_at >= data_ini)
+        if f_user:
+            sem_q = sem_q.filter(AccessLog.user_id == int(f_user))
+        if f_report:
+            sem_q = sem_q.filter(AccessLog.report_id == int(f_report))
+        if f_role:
+            sem_q = sem_q.filter(AccessLog.user_id.in_(user_ids_role))
+        dow_map = {int(r.dow): r.total for r in sem_q.group_by('dow').all()}
+        dias_semana_names = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo']
         acessos_semana = []
         for i, nome in enumerate(dias_semana_names):
-            pg_dow = (i + 1) % 7  # seg=1, ter=2... dom=0
+            pg_dow = (i + 1) % 7
             acessos_semana.append({"dia": nome, "total": dow_map.get(pg_dow, 0)})
 
         # ── Acessos por perfil ───────────────────────────────────
-        acessos_perfil_raw = db.session.query(
+        perf_q = db.session.query(
             User.role,
             func.count(AccessLog.id).label('total')
-        ).join(
-            AccessLog, AccessLog.user_id == User.id
-        ).filter(
-            AccessLog.accessed_at >= mes
-        ).group_by(User.role).all()
-
-        # Busca labels das roles
+        ).join(AccessLog, AccessLog.user_id == User.id
+        ).filter(AccessLog.accessed_at >= data_ini)
+        if f_user:
+            perf_q = perf_q.filter(AccessLog.user_id == int(f_user))
+        if f_report:
+            perf_q = perf_q.filter(AccessLog.report_id == int(f_report))
+        if f_role:
+            perf_q = perf_q.filter(AccessLog.user_id.in_(user_ids_role))
         roles_labels = {r.key: r.label for r in Role.query.all()}
         acessos_perfil = [
-            {
-                "role":  roles_labels.get(r.role, r.role),
-                "total": r.total
-            }
-            for r in acessos_perfil_raw
+            {"role": roles_labels.get(r.role, r.role), "role_key": r.role, "total": r.total}
+            for r in perf_q.group_by(User.role).all()
         ]
+
+        # ── Dados para os selects de filtro ──────────────────────
+        all_users   = User.query.filter_by(active=True).order_by(User.name).all()
+        all_reports = Report.query.filter_by(active=True).order_by(Report.name).all()
+        all_roles   = Role.query.filter_by(active=True).order_by(Role.label).all()
 
         return render_template("admin_analytics.html",
             user=user,
             total_hoje=total_hoje,
             total_semana=total_semana,
-            total_mes=total_mes,
+            total_periodo=total_periodo,
             usuarios_ativos=usuarios_ativos,
             acessos_dia=acessos_dia,
             top_reports=top_reports,
@@ -1143,4 +1231,11 @@ def init_routes(app, db, mail,
             acessos_hora=acessos_hora,
             acessos_semana=acessos_semana,
             acessos_perfil=acessos_perfil,
+            all_users=all_users,
+            all_reports=all_reports,
+            all_roles=all_roles,
+            f_days=f_days,
+            f_user=f_user,
+            f_role=f_role,
+            f_report=f_report,
         )
