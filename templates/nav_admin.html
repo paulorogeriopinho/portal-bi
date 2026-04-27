@@ -73,11 +73,15 @@
 {% endif %}
 
 {% if user.is_admin or 'logs' in user_modules %}
-<a href="/admin/logs"
-   class="pp-nav-link {% if path.startswith('/admin/logs') %}active{% endif %}">
-  Logs
-</a>
-{% endif %}
+  <a href="/admin/logs"
+     class="pp-nav-link {% if path.startswith('/admin/logs') %}active{% endif %}">
+    Logs
+  </a>
+  <a href="/admin/analytics"
+     class="pp-nav-link {% if path.startswith('/admin/analytics') %}active{% endif %}">
+    Analytics
+  </a>
+  {% endif %}
 
 {% if user.is_admin or 'settings' in user_modules %}
 <a href="/admin/settings"

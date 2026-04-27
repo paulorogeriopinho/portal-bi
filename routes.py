@@ -1003,3 +1003,144 @@ def init_routes(app, db, mail,
                 fav.position = i
         db.session.commit()
         return jsonify({"status": "ok"})
+    
+    # ── Favoritos ─────────────────────────────────────────────────
+
+    @app.route("/admin/analytics")
+    @jwt_required()
+    def admin_analytics():
+        user_id = int(get_jwt_identity())
+        user    = User.query.get(user_id)
+        if not check_module_access(user, "logs"):
+            return redirect(url_for("dashboard"))
+
+        from sqlalchemy import func, cast, Date
+        from datetime import datetime, timedelta
+
+        hoje   = datetime.utcnow().date()
+        semana = hoje - timedelta(days=7)
+        mes    = hoje - timedelta(days=30)
+
+        # ── Cards de resumo ──────────────────────────────────────
+        total_hoje   = AccessLog.query.filter(
+            cast(AccessLog.accessed_at, Date) == hoje).count()
+        total_semana = AccessLog.query.filter(
+            AccessLog.accessed_at >= semana).count()
+        total_mes    = AccessLog.query.filter(
+            AccessLog.accessed_at >= mes).count()
+        usuarios_ativos = db.session.query(
+            func.count(func.distinct(AccessLog.user_id))
+        ).filter(AccessLog.accessed_at >= mes).scalar()
+
+        # ── Acessos por dia (últimos 30 dias) ────────────────────
+        acessos_dia_raw = db.session.query(
+            cast(AccessLog.accessed_at, Date).label('dia'),
+            func.count().label('total')
+        ).filter(
+            AccessLog.accessed_at >= mes
+        ).group_by(
+            cast(AccessLog.accessed_at, Date)
+        ).order_by('dia').all()
+
+        # Preenche dias sem acesso com 0
+        dias_map = {str(r.dia): r.total for r in acessos_dia_raw}
+        acessos_dia = []
+        for i in range(30):
+            d = str(mes + timedelta(days=i))
+            acessos_dia.append({"dia": d, "total": dias_map.get(d, 0)})
+
+        # ── Top relatórios (top 10) ──────────────────────────────
+        top_reports_raw = db.session.query(
+            Report.name,
+            func.count(AccessLog.id).label('total')
+        ).join(
+            AccessLog, AccessLog.report_id == Report.id
+        ).filter(
+            AccessLog.accessed_at >= mes
+        ).group_by(Report.name).order_by(
+            func.count(AccessLog.id).desc()
+        ).limit(10).all()
+
+        top_reports = [{"name": r.name, "total": r.total} for r in top_reports_raw]
+
+        # ── Usuários mais ativos (top 10) ────────────────────────
+        top_users_raw = db.session.query(
+            User.name,
+            User.role,
+            func.count(AccessLog.id).label('total')
+        ).join(
+            AccessLog, AccessLog.user_id == User.id
+        ).filter(
+            AccessLog.accessed_at >= mes
+        ).group_by(User.name, User.role).order_by(
+            func.count(AccessLog.id).desc()
+        ).limit(10).all()
+
+        top_users = [
+            {"name": u.name, "role": u.role, "total": u.total}
+            for u in top_users_raw
+        ]
+
+        # ── Acessos por hora do dia ──────────────────────────────
+        acessos_hora_raw = db.session.query(
+            func.extract('hour', AccessLog.accessed_at).label('hora'),
+            func.count().label('total')
+        ).filter(
+            AccessLog.accessed_at >= mes
+        ).group_by('hora').order_by('hora').all()
+
+        horas_map = {int(r.hora): r.total for r in acessos_hora_raw}
+        acessos_hora = [
+            {"hora": f"{h:02d}h", "total": horas_map.get(h, 0)}
+            for h in range(24)
+        ]
+
+        # ── Acessos por dia da semana ────────────────────────────
+        dias_semana_names = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo']
+        acessos_semana_raw = db.session.query(
+            func.extract('dow', AccessLog.accessed_at).label('dow'),
+            func.count().label('total')
+        ).filter(
+            AccessLog.accessed_at >= mes
+        ).group_by('dow').all()
+
+        # PostgreSQL: dow 0=domingo, 1=segunda... ajusta para seg=0
+        dow_map = {int(r.dow): r.total for r in acessos_semana_raw}
+        acessos_semana = []
+        for i, nome in enumerate(dias_semana_names):
+            pg_dow = (i + 1) % 7  # seg=1, ter=2... dom=0
+            acessos_semana.append({"dia": nome, "total": dow_map.get(pg_dow, 0)})
+
+        # ── Acessos por perfil ───────────────────────────────────
+        acessos_perfil_raw = db.session.query(
+            User.role,
+            func.count(AccessLog.id).label('total')
+        ).join(
+            AccessLog, AccessLog.user_id == User.id
+        ).filter(
+            AccessLog.accessed_at >= mes
+        ).group_by(User.role).all()
+
+        # Busca labels das roles
+        roles_labels = {r.key: r.label for r in Role.query.all()}
+        acessos_perfil = [
+            {
+                "role":  roles_labels.get(r.role, r.role),
+                "total": r.total
+            }
+            for r in acessos_perfil_raw
+        ]
+
+        return render_template("admin_analytics.html",
+            user=user,
+            total_hoje=total_hoje,
+            total_semana=total_semana,
+            total_mes=total_mes,
+            usuarios_ativos=usuarios_ativos,
+            acessos_dia=acessos_dia,
+            top_reports=top_reports,
+            top_users=top_users,
+            acessos_hora=acessos_hora,
+            acessos_semana=acessos_semana,
+            acessos_perfil=acessos_perfil,
+        )

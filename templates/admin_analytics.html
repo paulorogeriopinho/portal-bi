@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block nav_links %}{% include "nav_admin.html" %}{% endblock %}
+
+{% block extra_style %}
+<style>
+  {% set current_user = user %}
+
+  .analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .metric-card {
+    background: #fff; border-radius: 10px;
+    border: 1px solid var(--pp-gray100);
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(13,27,42,0.04);
+  }
+  .metric-label {
+    font-size: 11px; font-weight: 700; color: var(--pp-gray500);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+  .metric-value {
+    font-size: 32px; font-weight: 700; color: var(--pp-navy);
+    line-height: 1;
+  }
+  .metric-sub {
+    font-size: 12px; color: var(--pp-gray500); margin-top: 6px;
+  }
+  .metric-icon {
+    float: right; font-size: 28px; opacity: 0.15; margin-top: -4px;
+  }
+
+  .charts-row {
+    display: grid; gap: 16px; margin-bottom: 16px;
+  }
+  .charts-row-1 { grid-template-columns: 1fr; }
+  .charts-row-2 { grid-template-columns: 1fr 1fr; }
+  .charts-row-3 { grid-template-columns: 2fr 1fr; }
+
+  .chart-card {
+    background: #fff; border-radius: 10px;
+    border: 1px solid var(--pp-gray100);
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(13,27,42,0.04);
+  }
+  .chart-title {
+    font-size: 13px; font-weight: 700; color: var(--pp-navy);
+    margin-bottom: 4px;
+  }
+  .chart-sub {
+    font-size: 11px; color: var(--pp-gray500); margin-bottom: 16px;
+  }
+  .chart-wrap { position: relative; }
+
+  /* Tabelas de ranking */
+  .rank-list { display: flex; flex-direction: column; gap: 8px; }
+  .rank-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--pp-gray100);
+  }
+  .rank-item:last-child { border-bottom: none; }
+  .rank-pos {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--pp-gray100); color: var(--pp-gray500);
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .rank-pos.top1 { background: #FEF3C7; color: #92400E; }
+  .rank-pos.top2 { background: #F1F5F9; color: #475569; }
+  .rank-pos.top3 { background: #FEF3C7; color: #B45309; }
+  .rank-info { flex: 1; min-width: 0; }
+  .rank-name {
+    font-size: 13px; font-weight: 500; color: var(--pp-navy);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .rank-meta { font-size: 11px; color: var(--pp-gray500); margin-top: 1px; }
+  .rank-bar-wrap {
+    width: 80px; flex-shrink: 0;
+  }
+  .rank-bar-bg {
+    height: 4px; background: var(--pp-gray100); border-radius: 2px; overflow: hidden;
+  }
+  .rank-bar-fill {
+    height: 100%; background: var(--pp-accent); border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+  .rank-count {
+    font-size: 12px; font-weight: 700; color: var(--pp-navy);
+    text-align: right; margin-bottom: 2px;
+  }
+
+  /* Badge de perfil inline */
+  .role-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0; display: inline-block;
+  }
+
+  @media (max-width: 900px) {
+    .analytics-grid { grid-template-columns: 1fr 1fr; }
+    .charts-row-2, .charts-row-3 { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% set current_user = user %}
+<div class="pp-container">
+
+  <div class="pp-page-header">
+    <div class="pp-page-title">Analytics</div>
+    <div class="pp-page-sub">Insights de uso do portal — últimos 30 dias.</div>
+  </div>
+
+  <!-- Cards de resumo -->
+  <div class="analytics-grid">
+    <div class="metric-card">
+      <div class="metric-label">Acessos hoje</div>
+      <span class="metric-icon">📅</span>
+      <div class="metric-value">{{ total_hoje }}</div>
+      <div class="metric-sub">acessos a relatórios</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Últimos 7 dias</div>
+      <span class="metric-icon">📈</span>
+      <div class="metric-value">{{ total_semana }}</div>
+      <div class="metric-sub">acessos na semana</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Últimos 30 dias</div>
+      <span class="metric-icon">📊</span>
+      <div class="metric-value">{{ total_mes }}</div>
+      <div class="metric-sub">acessos no mês</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Usuários ativos</div>
+      <span class="metric-icon">👥</span>
+      <div class="metric-value">{{ usuarios_ativos }}</div>
+      <div class="metric-sub">usuários únicos no mês</div>
+    </div>
+  </div>
+
+  <!-- Acessos por dia -->
+  <div class="charts-row charts-row-1">
+    <div class="chart-card">
+      <div class="chart-title">📈 Acessos por dia</div>
+      <div class="chart-sub">Evolução dos acessos nos últimos 30 dias</div>
+      <div class="chart-wrap" style="height:200px">
+        <canvas id="chart-dia"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top relatórios + usuários -->
+  <div class="charts-row charts-row-2">
+    <div class="chart-card">
+      <div class="chart-title">🏆 Relatórios mais acessados</div>
+      <div class="chart-sub">Top 10 — últimos 30 dias</div>
+      {% set max_r = top_reports[0].total if top_reports else 1 %}
+      <div class="rank-list">
+        {% for r in top_reports %}
+        <div class="rank-item">
+          <div class="rank-pos {% if loop.index == 1 %}top1{% elif loop.index == 2 %}top2{% elif loop.index == 3 %}top3{% endif %}">
+            {{ loop.index }}
+          </div>
+          <div class="rank-info">
+            <div class="rank-name" title="{{ r.name }}">{{ r.name }}</div>
+          </div>
+          <div class="rank-bar-wrap">
+            <div class="rank-count">{{ r.total }}</div>
+            <div class="rank-bar-bg">
+              <div class="rank-bar-fill" style="width:{{ (r.total / max_r * 100)|int }}%"></div>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div style="font-size:13px;color:var(--pp-gray300);padding:20px 0;text-align:center">
+          Nenhum acesso registrado.
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">👥 Usuários mais ativos</div>
+      <div class="chart-sub">Top 10 — últimos 30 dias</div>
+      {% set max_u = top_users[0].total if top_users else 1 %}
+      <div class="rank-list">
+        {% for u in top_users %}
+        <div class="rank-item">
+          <div class="rank-pos {% if loop.index == 1 %}top1{% elif loop.index == 2 %}top2{% elif loop.index == 3 %}top3{% endif %}">
+            {{ loop.index }}
+          </div>
+          <div class="rank-info">
+            <div class="rank-name" title="{{ u.name }}">{{ u.name }}</div>
+            <div class="rank-meta">{{ u.role }}</div>
+          </div>
+          <div class="rank-bar-wrap">
+            <div class="rank-count">{{ u.total }}</div>
+            <div class="rank-bar-bg">
+              <div class="rank-bar-fill" style="width:{{ (u.total / max_u * 100)|int }}%"></div>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div style="font-size:13px;color:var(--pp-gray300);padding:20px 0;text-align:center">
+          Nenhum acesso registrado.
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Hora + dia da semana + perfil -->
+  <div class="charts-row charts-row-3">
+    <div class="chart-card">
+      <div class="chart-title">⏰ Acessos por hora do dia</div>
+      <div class="chart-sub">Distribuição horária — últimos 30 dias</div>
+      <div class="chart-wrap" style="height:180px">
+        <canvas id="chart-hora"></canvas>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="chart-card">
+        <div class="chart-title">📅 Por dia da semana</div>
+        <div class="chart-sub">Últimos 30 dias</div>
+        <div class="chart-wrap" style="height:140px">
+          <canvas id="chart-semana"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">🎭 Por perfil</div>
+        <div class="chart-sub">Distribuição de acessos</div>
+        <div class="chart-wrap" style="height:140px">
+          <canvas id="chart-perfil"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% block extra_script %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  // Dados do servidor
+  var dadosDia     = {{ acessos_dia     | tojson }};
+  var dadosHora    = {{ acessos_hora    | tojson }};
+  var dadosSemana  = {{ acessos_semana  | tojson }};
+  var dadosPerfil  = {{ acessos_perfil  | tojson }};
+
+  // Paleta
+  var NAVY   = '#0D1B2A';
+  var CYAN   = getComputedStyle(document.documentElement)
+                 .getPropertyValue('--pp-accent').trim() || '#00A8CC';
+  var COLORS = ['#00A8CC','#1B4F8A','#00C9A7','#F59E0B','#EF4444','#7C3AED','#10B981'];
+
+  var defaultFont = {
+    family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    size: 11
+  };
+
+  Chart.defaults.font         = defaultFont;
+  Chart.defaults.color        = '#7A8899';
+  Chart.defaults.plugins.legend.display = false;
+
+  // ── Acessos por dia (linha) ──────────────────────────────────
+  new Chart(document.getElementById('chart-dia'), {
+    type: 'line',
+    data: {
+      labels: dadosDia.map(function(d) {
+        var parts = d.dia.split('-');
+        return parts[2] + '/' + parts[1];
+      }),
+      datasets: [{
+        data:            dadosDia.map(function(d) { return d.total; }),
+        borderColor:     CYAN,
+        backgroundColor: CYAN + '18',
+        borderWidth:     2,
+        pointRadius:     3,
+        pointHoverRadius:5,
+        pointBackgroundColor: CYAN,
+        fill:            true,
+        tension:         0.4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: {
+        title: function(items) { return 'Dia ' + items[0].label; },
+        label: function(item)  { return item.raw + ' acesso(s)'; }
+      }}},
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+        y: { grid: { color: '#EEF2F7' }, beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  });
+
+  // ── Acessos por hora (barras) ────────────────────────────────
+  new Chart(document.getElementById('chart-hora'), {
+    type: 'bar',
+    data: {
+      labels: dadosHora.map(function(d) { return d.hora; }),
+      datasets: [{
+        data:            dadosHora.map(function(d) { return d.total; }),
+        backgroundColor: dadosHora.map(function(d) {
+          var h = parseInt(d.hora);
+          // Horário comercial em destaque
+          return (h >= 8 && h <= 18) ? CYAN + 'CC' : CYAN + '44';
+        }),
+        borderRadius: 3,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: {
+        label: function(item) { return item.raw + ' acesso(s)'; }
+      }}},
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 12 } },
+        y: { grid: { color: '#EEF2F7' }, beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  });
+
+  // ── Por dia da semana (barras horizontais) ───────────────────
+  new Chart(document.getElementById('chart-semana'), {
+    type: 'bar',
+    data: {
+      labels: dadosSemana.map(function(d) { return d.dia; }),
+      datasets: [{
+        data:            dadosSemana.map(function(d) { return d.total; }),
+        backgroundColor: '#1B4F8A' + 'BB',
+        borderRadius:    3,
+        borderSkipped:   false
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { callbacks: {
+        label: function(item) { return item.raw + ' acesso(s)'; }
+      }}},
+      scales: {
+        x: { grid: { color: '#EEF2F7' }, beginAtZero: true, ticks: { precision: 0 } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+
+  // ── Por perfil (rosca) ───────────────────────────────────────
+  new Chart(document.getElementById('chart-perfil'), {
+    type: 'doughnut',
+    data: {
+      labels:   dadosPerfil.map(function(d) { return d.role; }),
+      datasets: [{
+        data:            dadosPerfil.map(function(d) { return d.total; }),
+        backgroundColor: COLORS,
+        borderWidth:     2,
+        borderColor:     '#fff',
+        hoverOffset:     4
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '65%',
+      plugins: {
+        legend: {
+          display:  true,
+          position: 'right',
+          labels:   { boxWidth: 10, padding: 8, font: { size: 11 } }
+        },
+        tooltip: { callbacks: {
+          label: function(item) {
+            var total = item.dataset.data.reduce(function(a,b){ return a+b; }, 0);
+            var pct   = total > 0 ? Math.round(item.raw / total * 100) : 0;
+            return item.label + ': ' + item.raw + ' (' + pct + '%)';
+          }
+        }}
+      }
+    }
+  });
+</script>
+{% endblock %}
+{% endblock %}
