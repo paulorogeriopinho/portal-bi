@@ -2,6 +2,9 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_mail import Mail
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_limiter.errors import RateLimitExceeded
 from dotenv import load_dotenv
 from datetime import timedelta
 import os
@@ -29,6 +32,19 @@ app.config["MAIL_DEFAULT_SENDER"]            = os.getenv("MAIL_FROM")
 db   = SQLAlchemy(app)
 jwt  = JWTManager(app)
 mail = Mail(app)
+
+limiter = Limiter(
+    key_func       = get_remote_address,
+    default_limits = []
+)
+
+# Logo após criar o app:
+limiter.init_app(app)
+
+@app.errorhandler(RateLimitExceeded)
+def handle_rate_limit(e):
+    from flask import render_template
+    return render_template("rate_limit.html"), 429
 
 @jwt.expired_token_loader
 def expired_token_callback(jwt_header, jwt_payload):
@@ -113,7 +129,7 @@ def inject_modules():
     return {"SYSTEM_MODULES": SYSTEM_MODULES}
 
 from routes import init_routes
-init_routes(app, db, mail,
+init_routes(app, db, mail, limiter,
             User, Report, ReportRLS, Group, ReportGroup,
             Permission, RolePermission, AccessLog,
             PasswordResetCode, PortalSettings,

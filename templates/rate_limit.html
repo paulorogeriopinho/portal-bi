@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block nav %}{% endblock %}
+{% block title %}Muitas tentativas{% endblock %}
+
+{% block extra_style %}
+<style>
+  body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .auth-card { background:#fff; border-radius:14px; padding:40px 36px; width:100%; max-width:400px; border:1px solid var(--pp-gray100); box-shadow:0 8px 40px rgba(13,27,42,0.1); text-align:center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-card">
+  <div style="font-size:48px;margin-bottom:16px">🚦</div>
+  <div class="pp-page-title" style="margin-bottom:8px">Muitas tentativas</div>
+  <div class="pp-page-sub" style="margin-bottom:24px">
+    Você excedeu o limite de tentativas. Aguarde alguns minutos antes de tentar novamente.
+  </div>
+  <a href="/login" class="pp-btn pp-btn-primary" style="display:inline-flex">
+    Voltar ao login
+  </a>
+</div>
+{% endblock %}
+
+{% block footer %}{% endblock %}

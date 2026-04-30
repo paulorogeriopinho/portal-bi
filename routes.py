@@ -11,7 +11,7 @@ from sqlalchemy import or_
 import random
 import string
 
-def init_routes(app, db, mail,
+def init_routes(app, db, mail, limiter,
                 User, Report, ReportRLS, Group, ReportGroup,
                 Permission, RolePermission, AccessLog,
                 PasswordResetCode, PortalSettings,
@@ -169,6 +169,7 @@ def init_routes(app, db, mail,
         return redirect(url_for("login"))
 
     @app.route("/login", methods=["GET", "POST"])
+    @limiter.limit("10 per minute")
     def login():
         if request.method == "GET":
             return render_template("login.html")
@@ -793,6 +794,7 @@ def init_routes(app, db, mail,
         return ''.join(random.choices(string.digits, k=6))
 
     @app.route("/forgot-password", methods=["GET", "POST"])
+    @limiter.limit("5 per minute")
     def forgot_password():
         if request.method == "GET":
             return render_template("forgot_password.html")
@@ -831,6 +833,7 @@ def init_routes(app, db, mail,
         return redirect(url_for("reset_password", email=email))
 
     @app.route("/reset-password", methods=["GET", "POST"])
+    @limiter.limit("5 per minute")
     def reset_password():
         if request.method == "GET":
             return render_template("reset_password.html", email=request.args.get("email", ""))
