@@ -8,13 +8,16 @@ import os
 
 load_dotenv()
 
+FLASK_ENV = os.getenv("FLASK_ENV", "development")
+IS_PROD   = FLASK_ENV == "production"
+
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"]        = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"]                 = os.getenv("JWT_SECRET_KEY")
 app.config["JWT_TOKEN_LOCATION"]             = ["cookies"]
-app.config["JWT_COOKIE_SECURE"]              = False
-app.config["JWT_COOKIE_CSRF_PROTECT"]        = False
+app.config["JWT_COOKIE_SECURE"]              = IS_PROD   # True em prod (exige HTTPS)
+app.config["JWT_COOKIE_CSRF_PROTECT"]        = IS_PROD   # True em prod
 app.config["JWT_ACCESS_TOKEN_EXPIRES"]       = timedelta(hours=8)
 app.config["MAIL_SERVER"]                    = "smtp.gmail.com"
 app.config["MAIL_PORT"]                      = 587
@@ -120,4 +123,8 @@ init_routes(app, db, mail,
 if __name__ == "__main__":
     with app.app_context():
         create_tables(db)
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(
+        debug  = not IS_PROD,
+        host   = "0.0.0.0",
+        port   = int(os.getenv("PORT", 5000))
+    )
