@@ -137,6 +137,11 @@
 <div class="pp-modal-overlay" id="modal-create">
   <div class="pp-modal">
     <div class="pp-modal-header">
+      {% if create_error %}
+      <div class="error-box" style="background:#FEE2E2;border:1px solid #FECACA;color:#991B1B;padding:10px 14px;border-radius:7px;font-size:13px;margin-bottom:16px">
+        {{ create_error }}
+      </div>
+      {% endif %}
       <div class="pp-modal-title">Novo usuário</div>
       <div class="pp-modal-sub">Preencha os dados do novo usuário do portal.</div>
     </div>
@@ -179,6 +184,11 @@
 <div class="pp-modal-overlay" id="modal-edit">
   <div class="pp-modal">
     <div class="pp-modal-header">
+      {% if edit_error and edit_user_id == u.id %}
+      <div class="error-box" style="background:#FEE2E2;border:1px solid #FECACA;color:#991B1B;padding:10px 14px;border-radius:7px;font-size:13px;margin-bottom:16px">
+        {{ edit_error }}
+      </div>
+      {% endif %}
       <div class="pp-modal-title">Editar usuário</div>
     </div>
     <form method="POST" id="form-edit">
@@ -220,6 +230,7 @@
   </div>
 </div>
 
+
 {% block extra_script %}
 <script>
   function openEditModal(id, name, email, role, revenda, depto, isAdmin, active) {
@@ -236,6 +247,13 @@
     }
     ppOpenModal('modal-edit');
   }
+
+  {% if create_error %}
+    // Se houver erro de criação, abre o modal de novo assim que a página carregar
+    document.addEventListener('DOMContentLoaded', function() {
+      ppOpenModal('modal-create');
+    });
+  {% endif %}
 </script>
 {% endblock %}
 {% endblock %}

@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import or_
 import random
 import string
+from auth import hash_password, check_password, validate_password
 
 def init_routes(app, db, mail, limiter,
                 User, Report, ReportRLS, Group, ReportGroup,
@@ -193,11 +194,16 @@ def init_routes(app, db, mail, limiter,
         if User.query.count() > 0:
             return redirect(url_for("login"))
         if request.method == "POST":
-            data  = request.form
+            data     = request.form
+            password = data.get("password", "")
+            valid, msg = validate_password(password)
+            if not valid:
+                return render_template("setup.html", error=msg)
             admin = User(
-                name=data["name"], email=data["email"],
-                password_hash=hash_password(data["password"]),
-                is_admin=True
+                name          = data["name"],
+                email         = data["email"],
+                password_hash = hash_password(password),
+                is_admin      = True
             )
             db.session.add(admin)
             db.session.commit()
@@ -254,7 +260,7 @@ def init_routes(app, db, mail, limiter,
                                loose_reports=loose_reports,
                                fav_reports=fav_reports,
                                fav_ids=fav_ids)
-
+    
     # ── Admin Users ───────────────────────────────────────────────
 
     @app.route("/admin/users")
@@ -302,16 +308,32 @@ def init_routes(app, db, mail, limiter,
         admin   = User.query.get(user_id)
         if not check_module_access(admin, "users"):
             return jsonify({"error": "Sem permissão"}), 403
+
         data     = request.form
+        password = data.get("password", "")
+        valid, msg = validate_password(password)
+        if not valid:
+            # Recarrega a tela de usuários com erro
+            q        = request.args.get("q", "")
+            f_role   = request.args.get("role", "")
+            f_rev    = request.args.get("revenda", "")
+            f_dep    = request.args.get("departamento", "")
+            f_status = request.args.get("status", "")
+            users    = User.query.order_by(User.name).all()
+            return render_template("admin_users.html",
+                                   user=admin, users=users,
+                                   q=q, f_role=f_role, f_rev=f_rev,
+                                   f_dep=f_dep, f_status=f_status,
+                                   create_error=msg), 400
+
         new_user = User(
             name            = data["name"],
             email           = data["email"],
-            password_hash   = hash_password(data["password"]),
+            password_hash   = hash_password(password),
             is_admin        = data.get("is_admin") == "on",
             role            = data.get("role", "user"),
             empresa_revenda = data.get("empresa_revenda") or None,
             departamento    = data.get("departamento") or None,
-            #client_id       = int(data["client_id"]) if data.get("client_id") else None,   -> Campo não está sendo utilizado, pode ser removido no futuro
             active          = True
         )
         db.session.add(new_user)
@@ -325,8 +347,23 @@ def init_routes(app, db, mail, limiter,
         admin   = User.query.get(user_id)
         if not check_module_access(admin, "users"):
             return jsonify({"error": "Sem permissão"}), 403
+
         data = request.form
         u    = User.query.get_or_404(target_id)
+
+        # Valida nova senha apenas se foi preenchida
+        new_password = data.get("password", "").strip()
+        if new_password:
+            valid, msg = validate_password(new_password)
+            if not valid:
+                users = User.query.order_by(User.name).all()
+                return render_template("admin_users.html",
+                                       user=admin, users=users,
+                                       q="", f_role="", f_rev="",
+                                       f_dep="", f_status="",
+                                       edit_error=msg,
+                                       edit_user_id=target_id), 400
+
         u.name            = data["name"]
         u.email           = data["email"]
         u.role            = data.get("role", "user")
@@ -334,9 +371,8 @@ def init_routes(app, db, mail, limiter,
         u.departamento    = data.get("departamento") or None
         u.is_admin        = data.get("is_admin") == "on"
         u.active          = data.get("active") == "on"
-        #u.client_id       = int(data["client_id"]) if data.get("client_id") else None   -> Campo não está sendo utilizado, pode ser removido no futuro
-        if data.get("password"):
-            u.password_hash = hash_password(data["password"])
+        if new_password:
+            u.password_hash = hash_password(new_password)
         db.session.commit()
         return redirect(url_for("admin_users"))
 
@@ -787,7 +823,7 @@ def init_routes(app, db, mail, limiter,
             f_role=f_role, f_report=f_report,
             f_date_from=f_date_from, f_date_to=f_date_to,
         )
-    
+
     # ── Recuperação de senha ──────────────────────────────────────
 
     def gerar_codigo():
@@ -848,9 +884,9 @@ def init_routes(app, db, mail, limiter,
         if password != confirm:
             return render_template("reset_password.html", email=email,
                                    error="As senhas não coincidem.")
-        if len(password) < 8:
-            return render_template("reset_password.html", email=email,
-                                   error="Mínimo 8 caracteres.")
+        valid, msg = validate_password(password)
+        if not valid:
+            return render_template("reset_password.html", email=email, error=msg)
         reset = PasswordResetCode.query.filter_by(
             user_id=user.id, code=code, used=False
         ).order_by(PasswordResetCode.created_at.desc()).first()
@@ -1058,7 +1094,7 @@ def init_routes(app, db, mail, limiter,
         db.session.commit()
         return jsonify({"status": "ok"})
     
-    # ── Favoritos ─────────────────────────────────────────────────
+    # ── analytics ─────────────────────────────────────────────────
 
     @app.route("/admin/analytics")
     @jwt_required()
