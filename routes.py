@@ -313,18 +313,14 @@ def init_routes(app, db, mail, limiter,
         password = data.get("password", "")
         valid, msg = validate_password(password)
         if not valid:
-            # Recarrega a tela de usuários com erro
-            q        = request.args.get("q", "")
-            f_role   = request.args.get("role", "")
-            f_rev    = request.args.get("revenda", "")
-            f_dep    = request.args.get("departamento", "")
-            f_status = request.args.get("status", "")
-            users    = User.query.order_by(User.name).all()
+            users = User.query.order_by(User.name).all()
             return render_template("admin_users.html",
                                    user=admin, users=users,
-                                   q=q, f_role=f_role, f_rev=f_rev,
-                                   f_dep=f_dep, f_status=f_status,
-                                   create_error=msg), 400
+                                   q="", f_role="", f_rev="",
+                                   f_dep="", f_status="",
+                                   form_error=msg,
+                                   form_error_modal="modal-create",
+                                   form_error_user_id=None), 400
 
         new_user = User(
             name            = data["name"],
@@ -348,11 +344,9 @@ def init_routes(app, db, mail, limiter,
         if not check_module_access(admin, "users"):
             return jsonify({"error": "Sem permissão"}), 403
 
-        data = request.form
-        u    = User.query.get_or_404(target_id)
-
-        # Valida nova senha apenas se foi preenchida
+        data         = request.form
         new_password = data.get("password", "").strip()
+
         if new_password:
             valid, msg = validate_password(new_password)
             if not valid:
@@ -361,9 +355,11 @@ def init_routes(app, db, mail, limiter,
                                        user=admin, users=users,
                                        q="", f_role="", f_rev="",
                                        f_dep="", f_status="",
-                                       edit_error=msg,
-                                       edit_user_id=target_id), 400
+                                       form_error=msg,
+                                       form_error_modal="modal-edit",
+                                       form_error_user_id=target_id), 400
 
+        u                 = User.query.get_or_404(target_id)
         u.name            = data["name"]
         u.email           = data["email"]
         u.role            = data.get("role", "user")

@@ -4,6 +4,27 @@
 
 {% block extra_style %}
 <style>
+  .pwd-checklist {
+    display: none; list-style: none;
+    margin: -8px 0 14px; padding: 8px 12px;
+    background: var(--pp-surface); border-radius: 7px;
+    border: 1px solid var(--pp-gray100); gap: 4px;
+    flex-direction: column;
+  }
+  .pwd-checklist.visible { display: flex; }
+  .pwd-checklist li {
+    font-size: 12px; display: flex; align-items: center; gap: 7px;
+    color: var(--pp-gray500); transition: color 0.2s;
+  }
+  .pwd-checklist li.ok  { color: #065F46; }
+  .pwd-checklist li.ok .pwd-icon  { background: #D1FAE5; color: #065F46; }
+  .pwd-checklist li .pwd-icon {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--pp-gray100); color: var(--pp-gray300);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; flex-shrink: 0;
+    transition: all 0.2s;
+  }
   {% set current_user = user %}
   .filter-bar {
     background: #fff; border-radius: 10px; border: 1px solid var(--pp-gray100);
@@ -137,21 +158,29 @@
 <div class="pp-modal-overlay" id="modal-create">
   <div class="pp-modal">
     <div class="pp-modal-header">
-      {% if create_error %}
-      <div class="error-box" style="background:#FEE2E2;border:1px solid #FECACA;color:#991B1B;padding:10px 14px;border-radius:7px;font-size:13px;margin-bottom:16px">
-        {{ create_error }}
-      </div>
-      {% endif %}
       <div class="pp-modal-title">Novo usuário</div>
       <div class="pp-modal-sub">Preencha os dados do novo usuário do portal.</div>
     </div>
+    {% if form_error and form_error_modal == 'modal-create' %}
+    <div style="background:#FEE2E2;border:1px solid #FECACA;color:#991B1B;padding:10px 14px;border-radius:7px;font-size:13px;margin-bottom:16px">
+      ⚠️ {{ form_error }}
+    </div>
+    {% endif %}
     <form method="POST" action="/admin/users/create">
       <label class="pp-label">Nome</label>
       <input class="pp-input" type="text" name="name" required autofocus>
       <label class="pp-label">Email</label>
       <input class="pp-input" type="email" name="email" required>
       <label class="pp-label">Senha</label>
-      <input class="pp-input" type="password" name="password" required placeholder="Mínimo 8 caracteres">
+      <input class="pp-input" type="password" name="password" id="create-password"
+        placeholder="Mínimo 8 caracteres" required
+        oninput="checkPwd(this, 'create-checklist')">
+      <ul class="pwd-checklist" id="create-checklist">
+        <li id="create-len">    <span class="pwd-icon">✓</span> Mínimo 8 caracteres</li>
+        <li id="create-upper">  <span class="pwd-icon">✓</span> Uma letra maiúscula</li>
+        <li id="create-lower">  <span class="pwd-icon">✓</span> Uma letra minúscula</li>
+        <li id="create-number"> <span class="pwd-icon">✓</span> Um número</li>
+      </ul>
       <label class="pp-label">Perfil</label>
       <select class="pp-select" name="role">
         {% for r in active_roles %}
@@ -184,20 +213,28 @@
 <div class="pp-modal-overlay" id="modal-edit">
   <div class="pp-modal">
     <div class="pp-modal-header">
-      {% if edit_error and edit_user_id == u.id %}
-      <div class="error-box" style="background:#FEE2E2;border:1px solid #FECACA;color:#991B1B;padding:10px 14px;border-radius:7px;font-size:13px;margin-bottom:16px">
-        {{ edit_error }}
-      </div>
-      {% endif %}
       <div class="pp-modal-title">Editar usuário</div>
     </div>
+    {% if form_error and form_error_modal == 'modal-edit' %}
+    <div style="background:#FEE2E2;border:1px solid #FECACA;color:#991B1B;padding:10px 14px;border-radius:7px;font-size:13px;margin-bottom:16px">
+      ⚠️ {{ form_error }}
+    </div>
+    {% endif %}
     <form method="POST" id="form-edit">
       <label class="pp-label">Nome</label>
       <input class="pp-input" type="text" name="name" id="edit-name" required>
       <label class="pp-label">Email</label>
       <input class="pp-input" type="email" name="email" id="edit-email" required>
       <label class="pp-label">Nova senha <span style="color:var(--pp-gray300);font-weight:400">(deixe em branco para manter)</span></label>
-      <input class="pp-input" type="password" name="password" placeholder="Mínimo 8 caracteres">
+      <input class="pp-input" type="password" name="password" id="edit-password"
+        placeholder="Mínimo 8 caracteres"
+        oninput="checkPwd(this, 'edit-checklist')">
+      <ul class="pwd-checklist" id="edit-checklist">
+        <li id="edit-len">    <span class="pwd-icon">✓</span> Mínimo 8 caracteres</li>
+        <li id="edit-upper">  <span class="pwd-icon">✓</span> Uma letra maiúscula</li>
+        <li id="edit-lower">  <span class="pwd-icon">✓</span> Uma letra minúscula</li>
+        <li id="edit-number"> <span class="pwd-icon">✓</span> Um número</li>
+      </ul>
       <label class="pp-label">Perfil</label>
       <select class="pp-select" name="role" id="edit-role">
         {% for r in active_roles %}
@@ -253,6 +290,49 @@
     document.addEventListener('DOMContentLoaded', function() {
       ppOpenModal('modal-create');
     });
+  {% endif %}
+
+  // Checklist de senha em tempo real
+  function checkPwd(input, listId) {
+    var val  = input.value;
+    var list = document.getElementById(listId);
+
+    if (val.length === 0) {
+      list.classList.remove('visible');
+      return;
+    }
+    list.classList.add('visible');
+
+    var prefix = listId.replace('-checklist', '');
+    var rules  = [
+      { id: prefix + '-len',    ok: val.length >= 8 },
+      { id: prefix + '-upper',  ok: /[A-Z]/.test(val) },
+      { id: prefix + '-lower',  ok: /[a-z]/.test(val) },
+      { id: prefix + '-number', ok: /\d/.test(val) },
+    ];
+
+    rules.forEach(function(rule) {
+      var li   = document.getElementById(rule.id);
+      var icon = li.querySelector('.pwd-icon');
+      if (rule.ok) {
+        li.classList.add('ok');
+        icon.textContent = '✓';
+      } else {
+        li.classList.remove('ok');
+        icon.textContent = '✗';
+      }
+    });
+  }
+
+  // Abre modal automaticamente se voltou com erro do servidor
+  {% if form_error and form_error_modal %}
+  document.addEventListener('DOMContentLoaded', function() {
+    ppOpenModal('{{ form_error_modal }}');
+    {% if form_error_user_id %}
+    // Pré-preenche o ID no form de edição
+    document.getElementById('form-edit').action = '/admin/users/edit/{{ form_error_user_id }}';
+    {% endif %}
+  });
   {% endif %}
 </script>
 {% endblock %}

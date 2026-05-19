@@ -4,6 +4,27 @@
 
 {% block extra_style %}
 <style>
+  .pwd-checklist {
+    display: none; list-style: none;
+    margin: -8px 0 14px; padding: 8px 12px;
+    background: var(--pp-surface); border-radius: 7px;
+    border: 1px solid var(--pp-gray100); gap: 4px;
+    flex-direction: column;
+  }
+  .pwd-checklist.visible { display: flex; }
+  .pwd-checklist li {
+    font-size: 12px; display: flex; align-items: center; gap: 7px;
+    color: var(--pp-gray500); transition: color 0.2s;
+  }
+  .pwd-checklist li.ok  { color: #065F46; }
+  .pwd-checklist li.ok .pwd-icon  { background: #D1FAE5; color: #065F46; }
+  .pwd-checklist li .pwd-icon {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--pp-gray100); color: var(--pp-gray300);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; flex-shrink: 0;
+    transition: all 0.2s;
+  }
   body { display:flex; align-items:center; justify-content:center; min-height:100vh; }
   .setup-card { background:#fff; border-radius:14px; padding:40px 36px; width:100%; max-width:420px; border:1px solid var(--pp-gray100); box-shadow:0 8px 40px rgba(13,27,42,0.1); }
   .setup-logo { width:48px; height:48px; border-radius:11px; background:var(--pp-accent); display:flex; align-items:center; justify-content:center; margin-bottom:20px; }
@@ -27,10 +48,65 @@
     <label class="pp-label">Email</label>
     <input class="pp-input" type="email" name="email" placeholder="admin@empresa.com" required>
     <label class="pp-label">Senha</label>
-    <input class="pp-input" type="password" name="password" placeholder="Mínimo 8 caracteres" required>
+    <input class="pp-input" type="password" name="password" id="setup-password"
+      placeholder="Mínimo 8 caracteres" required
+      oninput="checkPwd(this, 'setup-checklist')">
+    <ul class="pwd-checklist" id="setup-checklist">
+      <li id="setup-len">    <span class="pwd-icon">✓</span> Mínimo 8 caracteres</li>
+      <li id="setup-upper">  <span class="pwd-icon">✓</span> Uma letra maiúscula</li>
+      <li id="setup-lower">  <span class="pwd-icon">✓</span> Uma letra minúscula</li>
+      <li id="setup-number"> <span class="pwd-icon">✓</span> Um número</li>
+    </ul>
     <button type="submit" class="pp-btn pp-btn-primary" style="width:100%;justify-content:center">
       Criar administrador
     </button>
   </form>
 </div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+  // Checklist de senha em tempo real
+  function checkPwd(input, listId) {
+    var val  = input.value;
+    var list = document.getElementById(listId);
+
+    if (val.length === 0) {
+      list.classList.remove('visible');
+      return;
+    }
+    list.classList.add('visible');
+
+    var prefix = listId.replace('-checklist', '');
+    var rules  = [
+      { id: prefix + '-len',    ok: val.length >= 8 },
+      { id: prefix + '-upper',  ok: /[A-Z]/.test(val) },
+      { id: prefix + '-lower',  ok: /[a-z]/.test(val) },
+      { id: prefix + '-number', ok: /\d/.test(val) },
+    ];
+
+    rules.forEach(function(rule) {
+      var li   = document.getElementById(rule.id);
+      var icon = li.querySelector('.pwd-icon');
+      if (rule.ok) {
+        li.classList.add('ok');
+        icon.textContent = '✓';
+      } else {
+        li.classList.remove('ok');
+        icon.textContent = '✗';
+      }
+    });
+  }
+
+  // Abre modal automaticamente se voltou com erro do servidor
+  {% if form_error and form_error_modal %}
+  document.addEventListener('DOMContentLoaded', function() {
+    ppOpenModal('{{ form_error_modal }}');
+    {% if form_error_user_id %}
+    // Pré-preenche o ID no form de edição
+    document.getElementById('form-edit').action = '/admin/users/edit/{{ form_error_user_id }}';
+    {% endif %}
+  });
+  {% endif %}
+</script>
 {% endblock %}
