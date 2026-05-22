@@ -11,6 +11,9 @@ from sqlalchemy import or_
 import random
 import string
 from auth import hash_password, check_password, validate_password
+from datetime import timezone, timedelta
+
+BRASILIA = timezone(timedelta(hours=-3))
 
 def init_routes(app, db, mail, limiter,
                 User, Report, ReportRLS, Group, ReportGroup,
@@ -236,9 +239,10 @@ def init_routes(app, db, mail, limiter,
             return redirect(url_for("dashboard"))
 
         log = AccessLog(
-            user_id=user_id, report_id=report_id,
-            ip_address=request.remote_addr,
-            accessed_at=datetime.utcnow()
+            user_id     = user_id,
+            report_id   = report_id,
+            ip_address  = request.remote_addr,
+            accessed_at = datetime.now(BRASILIA).replace(tzinfo=None)
         )
         db.session.add(log)
         db.session.commit()
@@ -838,7 +842,7 @@ def init_routes(app, db, mail, limiter,
         PasswordResetCode.query.filter_by(user_id=user.id, used=False).update({"used": True})
         db.session.flush()
         code       = gerar_codigo()
-        expires_at = datetime.utcnow() + timedelta(minutes=15)
+        expires_at = datetime.now(BRASILIA).replace(tzinfo=None) + timedelta(minutes=15)
         reset      = PasswordResetCode(user_id=user.id, code=code, expires_at=expires_at)
         db.session.add(reset)
         db.session.commit()
@@ -889,7 +893,7 @@ def init_routes(app, db, mail, limiter,
         if not reset:
             return render_template("reset_password.html", email=email,
                                    error="Código inválido ou já utilizado.")
-        if datetime.utcnow() > reset.expires_at:
+        if datetime.now(BRASILIA).replace(tzinfo=None) > reset.expires_at:
             reset.used = True
             db.session.commit()
             return render_template("reset_password.html", email=email,
@@ -1043,7 +1047,7 @@ def init_routes(app, db, mail, limiter,
                 setting = PortalSettings.query.filter_by(key=key).first()
                 if setting:
                     setting.value      = data.get(key, "")
-                    setting.updated_at = datetime.utcnow()
+                    setting.updated_at = datetime.now(BRASILIA).replace(tzinfo=None)
                 else:
                     db.session.add(PortalSettings(key=key, value=data.get(key, "")))
             db.session.commit()
@@ -1110,11 +1114,14 @@ def init_routes(app, db, mail, limiter,
         f_report  = request.args.get("report_id","").strip()
 
         # Limita opções de período
-        if f_days not in [7, 15, 30, 60, 90]:
+        if f_days not in [1, 7, 15, 30, 60, 90]:
             f_days = 30
 
-        hoje      = datetime.utcnow().date()
-        data_ini  = hoje - timedelta(days=f_days)
+        hoje     = datetime.now(BRASILIA).date()
+        if f_days == 1:
+            data_ini = hoje
+        else:
+            data_ini = hoje - timedelta(days=f_days)
 
         # Query base com filtros
         base_q = AccessLog.query.filter(AccessLog.accessed_at >= data_ini)
@@ -1128,9 +1135,9 @@ def init_routes(app, db, mail, limiter,
 
         # ── Cards de resumo ──────────────────────────────────────
         total_periodo = base_q.count()
-        total_hoje    = AccessLog.query.filter(
+        total_hoje   = AccessLog.query.filter(
             cast(AccessLog.accessed_at, Date) == hoje).count()
-        total_semana  = AccessLog.query.filter(
+        total_semana = AccessLog.query.filter(
             AccessLog.accessed_at >= hoje - timedelta(days=7)).count()
         usuarios_ativos = db.session.query(
             func.count(func.distinct(AccessLog.user_id))
@@ -1153,7 +1160,8 @@ def init_routes(app, db, mail, limiter,
 
         dias_map   = {str(r.dia): r.total for r in acessos_dia_raw}
         acessos_dia = []
-        for i in range(f_days):
+        dias_range  = 1 if f_days == 1 else f_days
+        for i in range(dias_range):
             d = str(data_ini + timedelta(days=i))
             acessos_dia.append({"dia": d, "total": dias_map.get(d, 0)})
 
