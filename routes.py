@@ -12,6 +12,7 @@ import random
 import string
 from auth import hash_password, check_password, validate_password
 from datetime import timezone, timedelta
+from powerbi import get_embed_token, clear_embed_cache
 
 BRASILIA = timezone(timedelta(hours=-3))
 
@@ -462,6 +463,7 @@ def init_routes(app, db, mail, limiter,
         report.workspace_id = data["workspace_id"]
         report.has_rls      = data.get("has_rls") == "on"
         db.session.commit()
+        clear_embed_cache(str(report.report_id))  # limpa cache deste relatório
         return redirect(url_for("admin_reports"))
 
     @app.route("/admin/reports/toggle/<int:report_id>", methods=["POST"])
@@ -481,6 +483,8 @@ def init_routes(app, db, mail, limiter,
     def admin_delete_report(report_id):
         user_id = int(get_jwt_identity())
         admin   = db.session.get(User, user_id)
+        report = db.session.get(Report, report_id)
+        pbi_id = report.report_id  # salva antes de deletar
         if not check_module_access(admin, "reports"):
             return jsonify({"error": "Sem permissão"}), 403
         Permission.query.filter_by(report_id=report_id).delete()
@@ -489,6 +493,7 @@ def init_routes(app, db, mail, limiter,
         ReportRLS.query.filter_by(report_id=report_id).delete()
         Report.query.filter_by(id=report_id).delete()
         db.session.commit()
+        clear_embed_cache(str(pbi_id))
         return redirect(url_for("admin_reports"))
 
     @app.route("/admin/reports/<int:report_id>/rls/save", methods=["POST"])
