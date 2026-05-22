@@ -94,7 +94,7 @@ def inject_settings():
             verify_jwt_in_request(optional=True)
             uid = get_jwt_identity()
             if uid:
-                u = User.query.get(int(uid))
+                u = db.session.get(User, int(uid))
                 if u:
                     role_mods = {rm.module for rm in RoleModulePermission.query.filter_by(role=u.role).all()}
                     user_mods = {um.module for um in UserModulePermission.query.filter_by(user_id=u.id).all()}
