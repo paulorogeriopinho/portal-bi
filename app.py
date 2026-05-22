@@ -80,53 +80,47 @@ def role_info_filter(role_key):
     except Exception:
         return {"label": role_key, "color": "#7A8899"}
 
-def get_portal_settings():
-    """Retorna dict com todas as configurações do portal."""
-    rows = PortalSettings.query.all()
-    return {r.key: r.value for r in rows}
-
-@app.context_processor
-def inject_settings():
-    try:
-        settings = get_portal_settings()
-        from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
-        try:
-            verify_jwt_in_request(optional=True)
-            uid = get_jwt_identity()
-            if uid:
-                u = db.session.get(User, int(uid))
-                if u:
-                    role_mods = {rm.module for rm in RoleModulePermission.query.filter_by(role=u.role).all()}
-                    user_mods = {um.module for um in UserModulePermission.query.filter_by(user_id=u.id).all()}
-                    available = role_mods | user_mods
-                    if u.is_admin:
-                        available = {m["key"] for m in SYSTEM_MODULES}
-                    # Roles ativas para selects
-                    active_roles = Role.query.filter_by(active=True).order_by(Role.label).all()
-                    return {"portal": settings, "user_modules": available, "active_roles": active_roles}
-        except Exception:
-            pass
-        active_roles = Role.query.filter_by(active=True).order_by(Role.label).all()
-        return {"portal": settings, "user_modules": set(), "active_roles": active_roles}
-    except Exception:
-        return {"portal": {}, "user_modules": set(), "active_roles": []}
-    
-# Lista de todos os módulos disponíveis
+# ── Módulos do sistema (definido ANTES de ser usado) ────────────
 SYSTEM_MODULES = [
-    {"key": "logs",        "label": "Logs de acesso",    "icon": "📋", "url": "/admin/logs"},
-    {"key": "users",       "label": "Usuários",           "icon": "👥", "url": "/admin/users"},
-    {"key": "groups",      "label": "Grupos",             "icon": "📁", "url": "/admin/groups"},
-    {"key": "reports",     "label": "Relatórios",         "icon": "📊", "url": "/admin/reports"},
-    {"key": "permissions", "label": "Permissões",         "icon": "🔑", "url": "/admin/permissions"},
-    {"key": "roles",       "label": "Perfis RBAC",        "icon": "🎭", "url": "/admin/roles"},
-    {"key": "settings",    "label": "Configurações",      "icon": "⚙️",  "url": "/admin/settings"},
+    {"key": "logs",        "label": "Logs de acesso", "icon": "📋", "url": "/admin/logs"},
+    {"key": "users",       "label": "Usuários",        "icon": "👥", "url": "/admin/users"},
+    {"key": "groups",      "label": "Grupos",          "icon": "📁", "url": "/admin/groups"},
+    {"key": "reports",     "label": "Relatórios",      "icon": "📊", "url": "/admin/reports"},
+    {"key": "permissions", "label": "Permissões",      "icon": "🔑", "url": "/admin/permissions"},
+    {"key": "roles",       "label": "Perfis RBAC",     "icon": "🎭", "url": "/admin/roles"},
+    {"key": "settings",    "label": "Configurações",   "icon": "⚙️",  "url": "/admin/settings"},
 ]
-
 app.config["SYSTEM_MODULES"] = SYSTEM_MODULES
 
+# ── Context processor único (substitui inject_settings + inject_modules) ──
 @app.context_processor
-def inject_modules():
-    return {"SYSTEM_MODULES": SYSTEM_MODULES}
+def inject_globals():
+    base = {"SYSTEM_MODULES": SYSTEM_MODULES, "portal": {}, "user_modules": set(), "active_roles": []}
+    try:
+        rows = PortalSettings.query.all()
+        base["portal"] = {r.key: r.value for r in rows}
+    except Exception:
+        pass
+    try:
+        from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+        verify_jwt_in_request(optional=True)
+        uid = get_jwt_identity()
+        if uid:
+            u = db.session.get(User, int(uid))
+            if u:
+                role_mods = {rm.module for rm in RoleModulePermission.query.filter_by(role=u.role).all()}
+                user_mods = {um.module for um in UserModulePermission.query.filter_by(user_id=u.id).all()}
+                available = role_mods | user_mods
+                if u.is_admin:
+                    available = {m["key"] for m in SYSTEM_MODULES}
+                base["user_modules"] = available
+    except Exception:
+        pass
+    try:
+        base["active_roles"] = Role.query.filter_by(active=True).order_by(Role.label).all()
+    except Exception:
+        pass
+    return base
 
 from routes import init_routes
 init_routes(app, db, mail, limiter,
