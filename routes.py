@@ -57,73 +57,91 @@ def init_routes(app, db, mail, limiter,
     def get_user_reports(user):
         if user.is_admin:
             groups = Group.query.filter_by(active=True).order_by(Group.name).all()
-            all_grouped_ids = [rg.report_id for rg in ReportGroup.query.all()]
-            loose = Report.query.filter_by(active=True).filter(
-                ~Report.id.in_(all_grouped_ids) if all_grouped_ids else True
-            ).all()
+            all_rgs = ReportGroup.query.all()
         else:
-            role_group_ids = [
+            role_group_ids = {
                 rp.group_id for rp in
                 RolePermission.query.filter_by(role=user.role, report_id=None).all()
                 if rp.group_id
-            ]
-            user_group_ids = [
+            }
+            user_group_ids = {
                 p.group_id for p in
                 Permission.query.filter_by(user_id=user.id, report_id=None).all()
                 if p.group_id
-            ]
-            all_group_ids = list(set(role_group_ids + user_group_ids))
+            }
+            all_group_ids = list(role_group_ids | user_group_ids)
             groups = Group.query.filter(
                 Group.id.in_(all_group_ids), Group.active == True
             ).order_by(Group.name).all() if all_group_ids else []
 
-            role_report_ids = [
+            # Uma query só para todos os ReportGroups dos grupos relevantes
+            all_rgs = ReportGroup.query.filter(
+                ReportGroup.group_id.in_(all_group_ids)
+            ).all() if all_group_ids else []
+
+        # Monta mapa group_id → [report_ids] em memória (sem queries adicionais)
+        group_report_map = {}
+        for rg in all_rgs:
+            group_report_map.setdefault(rg.group_id, []).append(rg.report_id)
+
+        all_grouped_ids = {rg.report_id for rg in all_rgs}
+
+        if user.is_admin:
+            loose = Report.query.filter(
+                Report.active == True,
+                ~Report.id.in_(all_grouped_ids) if all_grouped_ids else Report.active == True
+            ).all()
+        else:
+            role_report_ids = {
                 rp.report_id for rp in
                 RolePermission.query.filter_by(role=user.role, group_id=None).all()
                 if rp.report_id
-            ]
-            user_report_ids = [
+            }
+            user_report_ids = {
                 p.report_id for p in
                 Permission.query.filter_by(user_id=user.id, group_id=None).all()
                 if p.report_id
-            ]
-            all_report_ids = list(set(role_report_ids + user_report_ids))
-
-            grouped_ids = [
-                rg.report_id for rg in
-                ReportGroup.query.filter(ReportGroup.group_id.in_(all_group_ids)).all()
-            ] if all_group_ids else []
-            loose_ids = [rid for rid in all_report_ids if rid not in grouped_ids]
+            }
+            all_report_ids = role_report_ids | user_report_ids
+            loose_ids      = all_report_ids - all_grouped_ids
             loose = Report.query.filter(
                 Report.id.in_(loose_ids), Report.active == True
             ).all() if loose_ids else []
 
-        # Favoritos ordenados por position
-        favs = UserFavorite.query.filter_by(user_id=user.id)\
-            .order_by(UserFavorite.position).all()
+        # Favoritos — uma query só
+        favs    = UserFavorite.query.filter_by(user_id=user.id).order_by(UserFavorite.position).all()
         fav_ids = [f.report_id for f in favs]
 
-        # Coleta todos os report_ids que o usuário pode ver
-        all_visible = set()
-        all_visible.update(r.id for r in loose)
-        for g in groups:
-            rg_ids = [rg.report_id for rg in ReportGroup.query.filter_by(group_id=g.id).all()]
-            all_visible.update(rg_ids)
+        # IDs visíveis para o usuário
+        group_visible_ids = set(all_grouped_ids) if user.is_admin else {
+            rid for gid in [g.id for g in groups]
+            for rid in group_report_map.get(gid, [])
+        }
+        all_visible = group_visible_ids | {r.id for r in loose}
 
-        # Favoritos que o usuário ainda tem acesso
-        fav_reports = []
-        for fid in fav_ids:
-            if fid in all_visible or user.is_admin:
-                r = Report.query.filter_by(id=fid, active=True).first()
-                if r:
-                    fav_reports.append(r)
+        # Busca todos os relatórios necessários em UMA query
+        all_needed_ids = all_visible | set(fav_ids)
+        if all_needed_ids:
+            reports_map = {
+                r.id: r for r in
+                Report.query.filter(
+                    Report.id.in_(all_needed_ids), Report.active == True
+                ).all()
+            }
+        else:
+            reports_map = {}
 
+        # Favoritos acessíveis
+        fav_reports = [
+            reports_map[fid] for fid in fav_ids
+            if fid in reports_map and (fid in all_visible or user.is_admin)
+        ]
+
+        # Grupos com relatórios
         groups_data = []
         for g in groups:
-            rg_ids  = [rg.report_id for rg in ReportGroup.query.filter_by(group_id=g.id).all()]
-            reports = Report.query.filter(
-                Report.id.in_(rg_ids), Report.active == True
-            ).all() if rg_ids else []
+            rg_ids  = group_report_map.get(g.id, [])
+            reports = [reports_map[rid] for rid in rg_ids if rid in reports_map]
             if reports:
                 groups_data.append({"group": g, "reports": reports})
 
