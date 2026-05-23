@@ -1,14 +1,14 @@
 {% set path = request.path %}
 {% if user is defined %}
 
-<a href="/dashboard"
+<a href="{{ url_for('dashboard.dashboard') }}"
    class="pp-nav-link {% if path == '/dashboard' %}active{% endif %}">
   Dashboard
 </a>
 
-{% if user.is_admin or 'users' in user_modules or 'permissions' in user_modules %}
+{% if user.is_admin or 'users' in user_modules %}
 <div class="pp-nav-dropdown">
-  <button class="pp-nav-dropdown-btn {% if path.startswith('/admin/users') or path.startswith('/admin/permissions') %}active{% endif %}">
+  <button class="pp-nav-dropdown-btn {% if '/admin/users' in path or '/admin/permissions' in path %}active{% endif %}">
     Usuários
     <svg viewBox="0 0 10 6" fill="none">
       <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -17,17 +17,15 @@
   <div class="pp-nav-dropdown-menu">
     <div class="pp-dropdown-label">Usuários</div>
     {% if user.is_admin or 'users' in user_modules %}
-    <a href="/admin/users"
+    <a href="{{ url_for('admin_users.admin_users') }}"
        class="pp-dropdown-item {% if path.startswith('/admin/users') %}active{% endif %}">
-      <div class="pp-dropdown-item-icon">👥</div>
-      Cadastros
+      <div class="pp-dropdown-item-icon">👥</div>Cadastros
     </a>
     {% endif %}
     {% if user.is_admin or 'permissions' in user_modules %}
-    <a href="/admin/permissions"
+    <a href="{{ url_for('admin_permissions.admin_permissions') }}"
        class="pp-dropdown-item {% if path.startswith('/admin/permissions') %}active{% endif %}">
-      <div class="pp-dropdown-item-icon">🔑</div>
-      Permissões
+      <div class="pp-dropdown-item-icon">🔑</div>Permissões
     </a>
     {% endif %}
   </div>
@@ -44,52 +42,49 @@
   </button>
   <div class="pp-nav-dropdown-menu">
     <div class="pp-dropdown-label">Perfis</div>
-    <a href="/admin/roles/manage"
+    <a href="{{ url_for('admin_roles.admin_roles_manage') }}"
        class="pp-dropdown-item {% if path == '/admin/roles/manage' %}active{% endif %}">
-      <div class="pp-dropdown-item-icon">🎭</div>
-      Cadastros
+      <div class="pp-dropdown-item-icon">🎭</div>Cadastros
     </a>
-    <a href="/admin/roles"
+    <a href="{{ url_for('admin_roles.admin_roles') }}"
        class="pp-dropdown-item {% if path == '/admin/roles' %}active{% endif %}">
-      <div class="pp-dropdown-item-icon">🔑</div>
-      Permissões
+      <div class="pp-dropdown-item-icon">🔑</div>Permissões
     </a>
   </div>
 </div>
 {% endif %}
 
 {% if user.is_admin or 'groups' in user_modules %}
-<a href="/admin/groups"
+<a href="{{ url_for('admin_groups.admin_groups') }}"
    class="pp-nav-link {% if path.startswith('/admin/groups') %}active{% endif %}">
   Grupos
 </a>
 {% endif %}
 
 {% if user.is_admin or 'reports' in user_modules %}
-<a href="/admin/reports"
+<a href="{{ url_for('admin_reports.admin_reports') }}"
    class="pp-nav-link {% if path.startswith('/admin/reports') %}active{% endif %}">
   Relatórios
 </a>
 {% endif %}
 
 {% if user.is_admin or 'logs' in user_modules %}
-  <a href="/admin/logs"
-     class="pp-nav-link {% if path.startswith('/admin/logs') %}active{% endif %}">
-    Logs
-  </a>
-  <a href="/admin/analytics"
-     class="pp-nav-link {% if path.startswith('/admin/analytics') %}active{% endif %}">
-    Analytics
-  </a>
-  {% endif %}
+<a href="{{ url_for('admin_logs.admin_logs') }}"
+   class="pp-nav-link {% if path.startswith('/admin/logs') %}active{% endif %}">
+  Logs
+</a>
+<a href="{{ url_for('admin_logs.admin_analytics') }}"
+   class="pp-nav-link {% if path.startswith('/admin/analytics') %}active{% endif %}">
+  Analytics
+</a>
+{% endif %}
 
 {% if user.is_admin or 'settings' in user_modules %}
-<a href="/admin/settings"
+<a href="{{ url_for('admin_settings.admin_settings') }}"
    class="pp-nav-link {% if path.startswith('/admin/settings') %}active{% endif %}">
   Configurações
 </a>
 {% endif %}
 
 {% endif %}
-
-<a href="/logout" class="pp-nav-link">Sair</a>
+<a href="{{ url_for('auth.logout') }}" class="pp-nav-link">Sair</a>
