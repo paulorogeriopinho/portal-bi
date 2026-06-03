@@ -76,21 +76,24 @@
       <div class="user-list" id="user-list">
         {% for u in users %}
         <div class="user-item"
-             data-id="{{ u.id }}" data-name="{{ u.name.lower() }}" data-role="{{ u.role }}"
-             onclick="selectUser({{ u.id }},'{{ u.name }}','{{ u.role }}','{{ u.empresa_revenda or '' }}','{{ u.departamento or '' }}')">
+             data-id="{{ u.id }}"
+             data-name="{{ u.name.lower() }}"
+             data-email="{{ u.email.lower() }}"
+             data-role="{{ u.role }}"
+             onclick="selectUser({{ u.id }},'{{ u.name }}','{{ u.email }}','{{ u.role }}','{{ u.empresa_revenda or '' }}','{{ u.departamento or '' }}')">
           <div class="avatar {{ u.role }}">{{ u.name[:2].upper() }}</div>
           <div class="user-meta">
             <div class="user-meta-name">{{ u.name }}</div>
-            <div class="user-meta-role">
-              {% if u.role == 'gerente' %}Gerente
-              {% elif u.role == 'diretor' %}Diretor
-              {% else %}Usuário{% endif %}
+            <div class="user-meta-role" style="font-size:11px;color:var(--pp-gray500)">
+              {{ u.email }}
             </div>
           </div>
           <span class="count-badge" id="badge-{{ u.id }}">—</span>
         </div>
         {% endfor %}
-        <div class="no-results" id="no-results" style="display:none">Nenhum usuário encontrado.</div>
+        <div class="no-results" id="no-results" style="display:none">
+          Nenhum usuário encontrado.
+        </div>
       </div>
     </div>
 
@@ -121,28 +124,69 @@
   }
 
   function filterUsers() {
-    var q = document.getElementById('user-search').value.toLowerCase();
+    var q     = document.getElementById('user-search').value.toLowerCase();
     var items = document.querySelectorAll('.user-item');
     var found = 0;
     items.forEach(function(item) {
-      var show = item.dataset.name.includes(q) && (!roleFilter || item.dataset.role === roleFilter);
+      var name  = item.dataset.name  || '';
+      var email = item.dataset.email || '';
+      var show  = (!roleFilter || item.dataset.role === roleFilter) &&
+                  (!q || name.includes(q) || email.includes(q));
       item.style.display = show ? '' : 'none';
       if (show) found++;
     });
     document.getElementById('no-results').style.display = found === 0 ? '' : 'none';
   }
 
-  function selectUser(id, name, role, revenda, depto) {
+  function selectUser(id, name, email, role, revenda, depto) {
     currentUserId = id; currentTab = 'groups'; itemSearchQuery = '';
+
     document.querySelectorAll('.user-item').forEach(function(el) {
       el.classList.toggle('selected', parseInt(el.dataset.id) === id);
     });
-    var roleLabel = role === 'gerente' ? 'Gerente' : role === 'diretor' ? 'Diretor' : 'Usuário';
-    var meta = '<span>Perfil: ' + roleLabel + '</span>';
-    if (revenda) meta += '<span>Revenda: ' + revenda + '</span>';
-    if (depto)   meta += '<span>Depto: ' + depto + '</span>';
+
+    // Labels dos perfis dinâmicos via role_info não está disponível no JS,
+    // usamos o role como fallback legível
+    var roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
+
+    // Monta as informações do usuário no cabeçalho
+    var infoRows = '';
+    infoRows += '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">';
+    infoRows += '  <span style="font-size:12px;color:var(--pp-gray500)">✉</span>';
+    infoRows += '  <span style="font-size:12px;color:var(--pp-gray700)">' + email + '</span>';
+    infoRows += '</div>';
+
+    var extras = '';
+    if (revenda) {
+      extras += '<span style="font-size:11px;background:var(--pp-gray100);color:var(--pp-gray700);'
+              + 'padding:2px 8px;border-radius:10px">Revenda: ' + revenda + '</span>';
+    }
+    if (depto) {
+      extras += '<span style="font-size:11px;background:var(--pp-gray100);color:var(--pp-gray700);'
+              + 'padding:2px 8px;border-radius:10px">Depto: ' + depto + '</span>';
+    }
+
     document.getElementById('right-panel').innerHTML =
-      '<div class="right-header">...' +
+      '<div class="right-header">' +
+        '<div style="display:flex;align-items:center;gap:12px">' +
+          '<div style="width:40px;height:40px;border-radius:50%;background:var(--pp-accent);' +
+               'display:flex;align-items:center;justify-content:center;font-size:14px;' +
+               'font-weight:700;color:var(--pp-navy);flex-shrink:0">' +
+            name.substring(0,2).toUpperCase() +
+          '</div>' +
+          '<div>' +
+            '<div class="right-user-name">' + name + '</div>' +
+            infoRows +
+          '</div>' +
+        '</div>' +
+        (extras
+          ? '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">' + extras + '</div>'
+          : '') +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+          '<span style="font-size:11px;background:var(--pp-ice);color:var(--pp-blue);' +
+               'padding:3px 10px;border-radius:10px;font-weight:500">Perfil: ' + roleLabel + '</span>' +
+        '</div>' +
+      '</div>' +
       '<div class="pp-tabs">' +
         '<button class="pp-tab-btn active" id="tab-groups"  onclick="switchTab(\'groups\')">Grupos</button>' +
         '<button class="pp-tab-btn"        id="tab-reports" onclick="switchTab(\'reports\')">Relatórios</button>' +
@@ -150,6 +194,7 @@
       '</div>' +
       '<div class="list-search"><input id="item-search" placeholder="Buscar..." oninput="filterItems()"/></div>' +
       '<div class="item-list" id="item-list"><div class="loading">Carregando...</div></div>';
+
     loadUserPermissions(id);
   }
 
